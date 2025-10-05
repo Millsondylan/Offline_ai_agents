@@ -15,51 +15,89 @@ Works fully offline with local models via Ollama or with a manual provider. Desi
 
 ## Installation
 
-### Quick (no install)
+### Local virtualenv (recommended)
 
-- Run directly from this repo by adding `scripts` to your `PATH`:
+1. Install Python 3.11+ (macOS example):
+   ```bash
+   brew install python@3.12
+   ```
+2. Create and activate an isolated environment in this repo:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+3. Install the runtime dependencies:
+   ```bash
+   pip install textual watchdog requests keyring
+   ```
+4. (Optional) Install the production gate toolchain:
+   ```bash
+   pip install ruff bandit semgrep pip-audit pytest coverage
+   ```
 
-  - `export PATH="$PWD/scripts:$PATH"; agent`
+### Put the CLI on your PATH
+```bash
+export PATH="$PWD/scripts:$PATH"
+```
+Now `agent` will resolve to the repository launcher instead of any system/brew install. Re-run the export inside new shells or add it to your shell profile.
 
-### Optional: Homebrew (experimental)
+### Packaging options
 
-- This repo includes a Homebrew formula scaffold under `packaging/homebrew/`.
-- To publish, update `homepage`, `url`, and `sha256` in `packaging/homebrew/agent.rb`, then host a tap and install:
+- **Homebrew service (macOS):**
+  ```bash
+  brew tap YOURORG/agent
+  brew install agent
+  brew services start agent
+  ```
+  Update `packaging/homebrew/agent.rb` with your release URL + `sha256` before publishing.
+- **npm installer (macOS/Linux):**
+  ```bash
+  npm install -g @yourorg/agent   # or: npx @yourorg/agent -- --version
+  ```
+  The installer downloads a prebuilt binary when it exists and falls back to the Python module otherwise.
 
-  - `brew tap YOURORG/agent && brew install agent`
+### Requirements recap
 
-### Requirements
-
-- Python 3.10+ and `git`
-- Optional for TUI: `pip install textual`
-- Optional for local LLMs: [Ollama](https://ollama.com/) with one or more models pulled
-- Optional for gating: `ruff`, `pytest`, `coverage`, `bandit`, `semgrep`, `pip-audit`
+- Python 3.11+ and `git`
+- [Ollama](https://ollama.com/) (optional) for local models
+- Optional tools for quality gates: `ruff`, `pytest`, `coverage`, `bandit`, `semgrep`, `pip-audit`
 
 ## Getting Started
 
-### Launch TUI
+Activate your virtualenv first: `source .venv/bin/activate`.
 
-- `export PATH="$PWD/scripts:$PATH"; agent`
+### Launch the Textual TUI
+```bash
+agent
+```
+If Textual is missing you will be prompted—install it with `pip install textual`.
 
-### Run headless (single cycle)
+### Run a bounded headless cycle
+```bash
+agent run --max-cycles=1
+```
 
-- `scripts/agent run --max-cycles=1`
+### Keep the agent running 24/7
+- Local shell: `agent --headless --cooldown-seconds=0 &`
+- macOS service: `brew services start agent`
+- Linux sample: see `packaging/homebrew/README.md` for the systemd unit
 
-### Run continuously in background
+### Timeboxed reviews and scheduled commits
+```bash
+agent review ./frontend --duration 45m --post-review 120m
+agent commit --now            # force an immediate commit if gates pass
+agent commit --cadence 900    # change scheduled cadence to 15 minutes
+agent commit --off            # pause auto-commits
+```
 
-- Start: `scripts/agent-start`
-- Stop: `scripts/agent-stop`
-- Forever loop helper: `scripts/run_agent_forever.sh`
-
-### Non-interactive prompt to provider
-
-- `scripts/agent exec "Write a minimal patch adding a README section"`
-  - Saves raw provider output under `agent/local/qa/<timestamp>/provider_output.txt`
-
-### Ollama models helper
-
-- List models: `scripts/agent models`
-- Pull model: `scripts/agent models --pull qwen2.5-coder:7b-instruct`
+### Provider helpers
+```bash
+agent exec "Explain failing tests in cycle logs"
+agent models                 # list available models
+agent models --switch llama3 # select a default Ollama model
+ollama pull llama3           # make sure the model exists locally
+agent apikey set openai sk-...   # store hosted API keys securely
+```
 
 ## How It Works
 
@@ -79,12 +117,13 @@ Artifacts per cycle are written to `agent/artifacts/cycle_<N>_<timestamp>` and i
 
 ## Providers
 
-This agent supports two provider modes (configured in `agent/config.json`):
+This agent ships with flexible providers (configured in `agent/config.json`):
 
-- CommandProvider (default): pipes the prompt to a shell command and uses stdout as the model response. The included script `agent/local/ollama_provider.sh` integrates with Ollama.
-- ManualProvider: writes `prompt.md` and waits for you to drop a diff at either `agent/artifacts/.../inbox.patch` or `agent/inbox/<cycle_basename>.patch`.
+- `command` / `ollama`: pipes the prompt to a local command. Use the bundled `agent/local/ollama_provider.sh` or point directly at `ollama run <model>`.
+- `manual`: writes `prompt.md` and waits for you to drop a diff at either `agent/artifacts/.../inbox.patch` or `agent/inbox/<cycle_basename>.patch`.
+- `api`: uses a hosted model (OpenAI, Anthropic, etc.) with secrets stored via the system keyring (see `agent apikey`).
 
-Environment hints for Ollama provider:
+Environment hints for the Ollama command provider:
 - `OLLAMA_MODEL` or `MODEL` to select a specific model
 - `OLLAMA_HIDE_THINKING=1` to hide reasoning tokens (default)
 - `OLLAMA_NUM_CTX` and `OLLAMA_KV_CACHE_TYPE` to tune context and cache
@@ -144,17 +183,20 @@ For local testing, `agent/local/echo_patch.sh` emits a sample diff.
 - Default (TUI): `agent`
 - Headless loop: `agent --headless [--cooldown-seconds N]`
 - One-shot headless: `agent run --max-cycles=1`
+- Timeboxed session: `agent review <scope> --duration 45m --post-review 120m`
+- Commit scheduler controls: `agent commit --now`, `agent commit --cadence 900`, `agent commit --off`
 - Provider exec: `agent exec "<prompt>"`
-- Models helper (Ollama): `agent models [--pull <model>]`
+- Model management (Ollama or other local providers): `agent models`, `agent models --switch llama3`
+- API keys: `agent apikey set openai sk-...`, `agent apikey clear openai`
 
 ## Tips & Troubleshooting
 
-- TUI missing? Install Textual: `pip install textual`
-- Patch fails to apply? Set `patch.path_prefix` when your project is nested
+- Using macOS system Python 3.9? Create `.venv` with Homebrew’s 3.12 to avoid LibreSSL/urllib3 warnings.
+- TUI missing? Install Textual (inside your env): `pip install textual`
+- Patch fails to apply? Set `patch.path_prefix` when your project is nested.
 - Missing tools? Install as needed:
-  - `pipx install ruff bandit semgrep pip-audit`
-  - `pipx install pytest coverage` (or use your environment)
-- Using Ollama? Ensure a model is available: `ollama pull qwen2.5-coder:7b-instruct`
+  - `pip install ruff bandit semgrep pip-audit pytest coverage`
+- Using Ollama? Ensure the model is present: `ollama pull llama3` (or your preferred model).
 
 ## Contributing
 

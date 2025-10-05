@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any, Dict, List, Optional
 
-from .base import Analyzer, AnalyzerResult
+from .base import Analyzer, CommandResult, Grade, build_finding
 
 
 class RuffAnalyzer(Analyzer):
@@ -13,29 +12,74 @@ class RuffAnalyzer(Analyzer):
     def available(self) -> bool:
         return self._which("ruff")
 
-    def run(self, repo_root: str, cycle_dir: str, files: Optional[List[str]] = None) -> AnalyzerResult:
-        if not self.available():
-            return AnalyzerResult(self.name, ok=True, skipped=True, summary="ruff not found", data={})
-
-        targets = files or []
+    def execute(self, repo_root: str, cycle_dir: str, targets: List[str]) -> CommandResult:
         args = ["ruff", "check", "--output-format", "json"]
-        if targets:
-            args.extend(targets)
-        code, out = self._run(args, cwd=repo_root, timeout=600)
-        data: Dict[str, Any]
+        if self.settings.get("respect_noqa"):
+            args.append("--respect-noqa")
+        args.extend(targets or ["."])
+        timeout = int(self.settings.get("timeout", 600))
+        return self._run(args, cwd=repo_root, timeout=timeout)
+
+    def parse(
+        self,
+        repo_root: str,
+        cycle_dir: str,
+        command: CommandResult,
+        targets: List[str],
+    ) -> Dict[str, Any]:
         try:
-            data = json.loads(out or "{}")
-        except Exception:
-            data = {"raw": out}
+            data = json.loads(command.output or "[]")
+        except json.JSONDecodeError:
+            data = {"raw": command.output, "parse_error": True}
+        return {"results": data}
 
-        problems = 0
-        if isinstance(data, list):
-            problems = sum(1 for _ in data)
-        elif isinstance(data, dict) and "summary" in data:
-            problems = int(data.get("summary", {}).get("error_count", 0))
-        ok = code == 0 and problems == 0
+    def grade(
+        self,
+        repo_root: str,
+        cycle_dir: str,
+        command: CommandResult,
+        parsed: Dict[str, Any],
+        targets: List[str],
+    ) -> Grade:
+        records = parsed.get("results", [])
+        findings = []
+        if isinstance(records, list):
+            for item in records:
+                if not isinstance(item, dict):
+                    continue
+                rule = item.get("code", "")
+                filename = item.get("filename")
+                location = item.get("location", {}) if isinstance(item.get("location"), dict) else {}
+                message = item.get("message", "ruff violation")
+                severity = item.get("severity", "warning") or "warning"
+                findings.append(
+                    build_finding(
+                        identifier=f"ruff::{rule}",
+                        message=message,
+                        severity=severity.lower(),
+                        path=filename,
+                        line=int(location.get("row")) if location.get("row") else None,
+                        column=int(location.get("column")) if location.get("column") else None,
+                        suggestion="ruff check --fix",
+                        data={"rule": rule},
+                    )
+                )
+        status = "ok" if not findings else "failed"
+        summary = "ruff clean" if status == "ok" else f"{len(findings)} issues"
+        artifacts = {"ruff.json": parsed.get("results")}
+        data = {"issue_count": len(findings)}
+        return Grade(status=status, summary=summary, findings=findings, data=data, artifacts=artifacts)
 
-        out_path = os.path.join(cycle_dir, "ruff.json")
-        self._write_json(out_path, data if data else {"raw": out})
-        return AnalyzerResult(self.name, ok=ok, skipped=False, summary=f"issues={problems}", data=data)
-
+    def suggest_fixes(
+        self,
+        repo_root: str,
+        cycle_dir: str,
+        command: CommandResult,
+        parsed: Dict[str, Any],
+        grade: Grade,
+        targets: List[str],
+    ) -> List[str]:
+        if grade.status == "ok":
+            return []
+        scoped = " " + " ".join(targets) if targets else ""
+        return [f"ruff check --fix{scoped}"]

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any, Dict, List, Optional
 
-from .base import Analyzer, AnalyzerResult
+from .base import Analyzer, CommandResult, Grade, build_finding
 
 
 class PipAuditAnalyzer(Analyzer):
@@ -13,21 +12,88 @@ class PipAuditAnalyzer(Analyzer):
     def available(self) -> bool:
         return self._which("pip-audit")
 
-    def run(self, repo_root: str, cycle_dir: str, files: Optional[List[str]] = None, fix: bool = False) -> AnalyzerResult:
-        if not self.available():
-            return AnalyzerResult(self.name, ok=True, skipped=True, summary="pip-audit not found", data={})
-
+    def execute(self, repo_root: str, cycle_dir: str, targets: List[str]) -> CommandResult:
         args = ["pip-audit", "--format", "json"]
-        if fix:
+        if self.settings.get("fix"):
             args.append("--fix")
-        code, out = self._run(args, cwd=repo_root, timeout=1200)
-        try:
-            data = json.loads(out or "{}")
-        except Exception:
-            data = {"raw": out}
-        findings = len(data) if isinstance(data, list) else int(data.get("vulnerability_count", 0)) if isinstance(data, dict) else 0
-        ok = code == 0 and findings == 0
-        out_path = os.path.join(cycle_dir, "pip_audit.json")
-        self._write_json(out_path, data if data else {"raw": out})
-        return AnalyzerResult(self.name, ok=ok, skipped=False, summary=f"findings={findings}", data=data)
+        timeout = int(self.settings.get("timeout", 900))
+        return self._run(args, cwd=repo_root, timeout=timeout)
 
+    def parse(
+        self,
+        repo_root: str,
+        cycle_dir: str,
+        command: CommandResult,
+        targets: List[str],
+    ) -> Dict[str, Any]:
+        try:
+            payload = json.loads(command.output or "{}")
+        except json.JSONDecodeError:
+            payload = {"raw": command.output, "parse_error": True}
+        return payload
+
+    def grade(
+        self,
+        repo_root: str,
+        cycle_dir: str,
+        command: CommandResult,
+        parsed: Dict[str, Any],
+        targets: List[str],
+    ) -> Grade:
+        items: List[Dict[str, Any]] = []
+        if isinstance(parsed, list):
+            items = [i for i in parsed if isinstance(i, dict)]
+        elif isinstance(parsed, dict) and "dependencies" in parsed:
+            # pip-audit>=2 outputs {dependencies:[{name,version,vulns:[]}]}
+            for dep in parsed.get("dependencies", []):
+                vulns = dep.get("vulns", []) if isinstance(dep, dict) else []
+                for vuln in vulns:
+                    if isinstance(vuln, dict):
+                        data = dict(vuln)
+                        data["dependency"] = dep.get("name")
+                        items.append(data)
+        findings: List = []
+        for entry in items:
+            vuln_id = entry.get("id") or entry.get("identifier") or "unknown"
+            severity = (entry.get("severity") or "medium").lower()
+            fix_versions = entry.get("fix_version") or entry.get("fix_versions")
+            message = entry.get("description") or entry.get("title") or "pip-audit vulnerability"
+            suggestion = None
+            if fix_versions:
+                if isinstance(fix_versions, list):
+                    suggestion = f"upgrade to {'/'.join(fix_versions)}"
+                else:
+                    suggestion = f"upgrade to {fix_versions}"
+            findings.append(
+                build_finding(
+                    identifier=f"pip-audit::{vuln_id}",
+                    message=message,
+                    severity=severity,
+                    suggestion=suggestion,
+                    data={
+                        "dependency": entry.get("dependency") or entry.get("name"),
+                        "current_version": entry.get("version"),
+                        "advisory": entry.get("advisory"),
+                    },
+                )
+            )
+        status = "ok" if not findings else "failed"
+        summary = "pip-audit clean" if status == "ok" else f"{len(findings)} vulnerable packages"
+        artifacts = {"pip_audit.json": parsed}
+        data = {"total_findings": len(findings)}
+        return Grade(status=status, summary=summary, findings=findings, data=data, artifacts=artifacts)
+
+    def suggest_fixes(
+        self,
+        repo_root: str,
+        cycle_dir: str,
+        command: CommandResult,
+        parsed: Dict[str, Any],
+        grade: Grade,
+        targets: List[str],
+    ) -> List[str]:
+        if grade.status == "ok":
+            return []
+        if self.settings.get("fix"):
+            return []
+        return ["pip-audit --fix"]

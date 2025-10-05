@@ -1,16 +1,10 @@
 def launch_tui() -> int:
     try:
-        from .tui.app import AgentApp
-    except Exception as e:
-        print(f"TUI not available: {e}")
+        from .tui.app import launch_app
+    except RuntimeError as exc:
+        print(f"TUI unavailable: {exc}")
         return 1
-    app = AgentApp()
-    if hasattr(app, "run"):
-        app.run()
-    else:
-        print("Textual not installed. Try: pip install textual")
-        return 1
-    return 0
+    return launch_app()
 
 
 if __name__ == "__main__":

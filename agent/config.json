@@ -1,57 +1,46 @@
 {
   "provider": {
     "type": "command",
-    "manual": {
-      "notes": "Paste prompt.md into 5x/Claude and save returned unified diff to agent/inbox/cycle_<N>.patch"
-    },
+    "model": "llama3",
     "command": {
-      "cmd": ["bash", "-lc", "bash agent/local/ollama_provider.sh"],
-      "timeout_seconds": 1200
+      "args": ["bash", "-lc", "bash agent/local/ollama_provider.sh"],
+      "timeout": 1200
     }
   },
   "loop": {
     "max_cycles": 0,
-    "cooldown_seconds": 30,
+    "cooldown_seconds": 60,
     "apply_patches": true,
-    "require_manual_approval": false
+    "require_manual_approval": false,
+    "fast_path_on_fs_change": true
   },
-  "project": {
-    "type": "flutter",
-    "root": "."
+  "sessions": {
+    "enabled": true,
+    "default_duration_seconds": 3600,
+    "default_post_review_delay_seconds": 3600,
+    "max_duration_seconds": 28800
   },
   "commands": {
     "analyze": {
       "enabled": true,
-      "cmd": "cd insightflow_ai_trading && flutter analyze",
-      "timeout_seconds": 600
+      "cmd": "ruff check",
+      "timeout": 900
     },
     "test": {
       "enabled": true,
-      "cmd": "cd insightflow_ai_trading && flutter test -r expanded",
-      "timeout_seconds": 1200
+      "cmd": "pytest -q",
+      "timeout": 3600
     },
     "e2e": {
       "enabled": false,
-      "cmd": "flutter test integration_test",
-      "timeout_seconds": 1800
+      "cmd": "",
+      "timeout": 7200
     },
     "screenshots": {
-      "enabled": true,
-      "cmd": "bash scripts/take_screenshots.sh",
-      "collect_glob": "screenshots/**/*.png",
-      "timeout_seconds": 1800
+      "enabled": false,
+      "cmd": "",
+      "timeout": 600
     }
-  },
-  "git": {
-    "commit": true,
-    "branch": "agent/auto",
-    "push": false,
-    "open_pr": false,
-    "remote": "origin",
-    "push_interval_seconds": 900
-  },
-  "patch": {
-    "path_prefix": "insightflow_ai_trading/"
   },
   "gate": {
     "min_coverage": 0.8,
@@ -61,8 +50,28 @@
     "pip_audit_fix": false,
     "allow_override": false
   },
+  "ui_audits": {
+    "enabled": false,
+    "targets": ["http://localhost:3000/", "http://localhost:8000/"],
+    "lighthouse": {"enabled": true, "flags": ["--quiet", "--chrome-flags=--headless"]},
+    "axe": {"enabled": true, "flags": []},
+    "pa11y": {"enabled": true, "flags": []}
+  },
+  "git": {
+    "commit": true,
+    "branch": "agent/main",
+    "push": false,
+    "remote": "origin",
+    "push_interval_seconds": 900,
+    "commit_cadence_seconds": 3600,
+    "auto_commit": true
+  },
+  "patch": {
+    "path_prefix": ""
+  },
   "tui": {
-    "refresh_hz": 12,
-    "show_thinking": true
+    "refresh_hz": 15,
+    "show_thinking": true,
+    "theme": "auto"
   }
 }

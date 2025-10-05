@@ -1,8 +1,8 @@
 class Agent < Formula
   include Language::Python::Virtualenv
-  desc "Always-on offline agent that continuously improves your repo"
+  desc "Always-on offline-first coding agent with production gates and TUI"
   homepage "https://github.com/YOURORG/agent"
-  url "https://github.com/YOURORG/agent/archive/refs/tags/v0.1.0.tar.gz"
+  url "https://github.com/YOURORG/agent/archive/refs/tags/v0.2.0.tar.gz"
   sha256 "<FILL_ME>"
   license "Apache-2.0"
   depends_on "python@3.12"
@@ -21,7 +21,6 @@ class Agent < Formula
 
   test do
     system "#{bin}/agent", "--version"
-    system "#{bin}/agent", "run", "--max-cycles=1", "--apply-patches=0"
+    system "#{bin}/agent", "run", "--max-cycles=1"
   end
 end
-

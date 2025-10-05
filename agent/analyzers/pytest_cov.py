@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .base import Analyzer, AnalyzerResult
+from .base import Analyzer, AnalyzerResult, CommandResult, Grade, build_finding
 
 
 class PytestCoverageAnalyzer(Analyzer):
@@ -13,40 +14,108 @@ class PytestCoverageAnalyzer(Analyzer):
     def available(self) -> bool:
         return self._which("pytest") and self._which("coverage")
 
-    def run(self, repo_root: str, cycle_dir: str, files: Optional[List[str]] = None) -> AnalyzerResult:
+    def analyze(
+        self,
+        repo_root: str,
+        cycle_dir: str,
+        files: Optional[List[str]] = None,
+    ) -> AnalyzerResult:
         if not self.available():
-            return AnalyzerResult(self.name, ok=True, skipped=True, summary="pytest/coverage not found", data={})
+            return AnalyzerResult(
+                name=self.name,
+                status="skipped",
+                summary="pytest/coverage not available",
+                findings=[],
+                suggestions=[],
+                data={},
+                artifacts={},
+            )
 
-        junit_path = os.path.join(cycle_dir, "junit.xml")
-        code1, out1 = self._run(["coverage", "erase"], cwd=repo_root, timeout=120)
-        code2, out2 = self._run(["coverage", "run", "-m", "pytest", "-q", "--maxfail=1", "--disable-warnings", f"--junitxml={junit_path}"], cwd=repo_root, timeout=1800)
-        code3, out3 = self._run(["coverage", "json"], cwd=repo_root, timeout=120)
+        timeout = int(self.settings.get("timeout", 3600))
+        junit_path = Path(cycle_dir) / "junit.xml"
 
-        cov_json_path = os.path.join(repo_root, "coverage.json")
-        cov_data: Dict[str, Any] = {}
-        if os.path.exists(cov_json_path):
+        erase_res = self._run(["coverage", "erase"], cwd=repo_root, timeout=timeout)
+
+        cmd = [
+            "coverage",
+            "run",
+            "-m",
+            "pytest",
+            "-q",
+            "--maxfail=1",
+            "--disable-warnings",
+            f"--junitxml={junit_path}",
+        ]
+        extra_args = self.settings.get("args") or []
+        if isinstance(extra_args, str):
+            extra_args = [extra_args]
+        cmd.extend(extra_args)
+        if files:
+            cmd.extend(files)
+
+        pytest_res = self._run(cmd, cwd=repo_root, timeout=timeout)
+
+        cov_res = self._run(["coverage", "json"], cwd=repo_root, timeout=timeout)
+
+        cov_json_path = Path(repo_root) / "coverage.json"
+        cov_payload: Dict[str, Any] = {}
+        if cov_json_path.exists():
             try:
-                with open(cov_json_path, "r", encoding="utf-8") as f:
-                    cov_data = json.load(f)
-            except Exception:
-                cov_data = {"raw": "failed to parse coverage.json"}
-
-        # Move coverage.json into artifacts directory for consistency
-        if os.path.exists(cov_json_path):
+                cov_payload = json.loads(cov_json_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                cov_payload = {"raw": cov_json_path.read_text(encoding="utf-8", errors="replace")}
+            # move into artifacts dir to avoid polluting working tree
+            dest = Path(cycle_dir) / "coverage.json"
             try:
-                os.replace(cov_json_path, os.path.join(cycle_dir, "coverage.json"))
+                cov_json_path.replace(dest)
             except Exception:
-                pass
+                # fallback copy
+                dest.write_text(json.dumps(cov_payload, indent=2))
 
-        ok = code2 == 0
-        summary = f"pytest_ok={ok}"
-        # write a minimal report
         report = {
-            "pytest_code": code2,
-            "coverage_json": cov_data,
-            "stdout": out1 + "\n" + out2 + "\n" + out3,
+            "pytest_code": pytest_res.code,
+            "pytest_output": pytest_res.output,
+            "coverage": cov_payload,
+            "coverage_exit": cov_res.code,
+            "erase_exit": erase_res.code,
         }
-        out_path = os.path.join(cycle_dir, "pytest_cov.json")
-        self._write_json(out_path, report)
-        return AnalyzerResult(self.name, ok=ok, skipped=False, summary=summary, data=report)
 
+        artifacts = {"pytest_cov.json": report}
+        findings = []
+        suggestions: List[str] = []
+        if pytest_res.code != 0:
+            findings.append(
+                build_finding(
+                    identifier="pytest::failures",
+                    message="Pytest reported failures",
+                    severity="critical",
+                    suggestion="pytest -q",
+                    data={"output": pytest_res.output[:2000]},
+                )
+            )
+            suggestions.append("pytest -q")
+        if cov_res.code != 0:
+            findings.append(
+                build_finding(
+                    identifier="coverage::json",
+                    message="coverage json generation failed",
+                    severity="warning",
+                    suggestion="coverage json",
+                    data={"output": cov_res.output[:2000]},
+                )
+            )
+            suggestions.append("coverage json")
+
+        status = "ok" if pytest_res.code == 0 and cov_res.code == 0 else "failed"
+        summary = "tests passed" if status == "ok" else "tests failed"
+
+        return AnalyzerResult(
+            name=self.name,
+            status=status,
+            summary=summary,
+            findings=findings,
+            suggestions=suggestions,
+            data=report,
+            artifacts=artifacts,
+            command=pytest_res,
+        )
