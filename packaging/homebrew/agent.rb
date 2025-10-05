@@ -3,7 +3,7 @@ class Agent < Formula
   desc "Always-on offline-first coding agent with production gates and TUI"
   homepage "https://github.com/Millsondylan/Offline_ai_agents"
   url "https://github.com/Millsondylan/Offline_ai_agents/archive/refs/tags/v0.2.0.tar.gz"
-  sha256 "06753d13d41c2f31e41681386b2c367048df281c359c41e46128cc5ebc323737"
+  sha256 "45d00fd9c5b69b8b3db60d930f73c976db01971bde5dc95accf9b829611b3a1a"
   license "Apache-2.0"
   depends_on "python@3.12"
 
