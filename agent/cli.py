@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import List, Optional
@@ -77,12 +79,21 @@ def cmd_models(args: argparse.Namespace) -> int:
     except ProviderError as exc:
         print(f"provider error: {exc}")
         return 1
+
+    if args.pull:
+        if not shutil.which("ollama"):
+            print("ollama CLI not found on PATH. Install from https://ollama.com/ first.")
+            return 1
+        print(f"Pulling Ollama model: {args.pull}")
+        subprocess.run(["ollama", "pull", args.pull], check=False)
+
     if args.switch:
         cfg.setdefault("provider", {})["model"] = args.switch
         save_config(cfg)
         write_control("model", args.switch)
         print(f"Model switched to {args.switch}")
         return 0
+
     models = list(provider.list_models())
     if not models:
         print("No models available from current provider.")
@@ -140,7 +151,16 @@ def run_headless(args: argparse.Namespace) -> int:
 
 
 def open_tui() -> int:
-    from .view import launch_tui
+    try:
+        from .view import launch_tui
+    except RuntimeError as exc:
+        print(f"TUI unavailable: {exc}")
+        print("Use `agent --headless` for CLI mode or install Textual with `pip install textual`.\n"
+              "Common commands:\n"
+              "  agent run --max-cycles=1\n"
+              "  agent review <scope> --duration 30m\n"
+              "  agent commit --now\n")
+        return 1
 
     return launch_tui()
 
@@ -167,7 +187,8 @@ def build_parser() -> argparse.ArgumentParser:
     commit.add_argument("--off", action="store_true")
     commit.add_argument("--cadence", help="Set cadence (e.g. 1800s, 30m)")
 
-    models = subparsers.add_parser("models", help="List or switch models")
+    models = subparsers.add_parser("models", help="List, pull, or switch models")
+    models.add_argument("--pull", help="Download a model via ollama", default=None)
     models.add_argument("--switch", help="Set default model", default=None)
 
     apikey = subparsers.add_parser("apikey", help="Manage hosted API keys")

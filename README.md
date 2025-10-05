@@ -94,8 +94,8 @@ agent commit --off            # pause auto-commits
 ```bash
 agent exec "Explain failing tests in cycle logs"
 agent models                 # list available models
+agent models --pull llama3   # download via Ollama
 agent models --switch llama3 # select a default Ollama model
-ollama pull llama3           # make sure the model exists locally
 agent apikey set openai sk-...   # store hosted API keys securely
 ```
 
