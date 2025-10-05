@@ -232,7 +232,7 @@ class Sidebar(Vertical):
         yield Button("Toggle Auto-Commit", id="btn-toggle-commit")
         yield Button("Start Session", id="btn-session-start")
         yield Button("Stop Session", id="btn-session-stop")
-        yield Static("\nSlash commands available via input below.", classes="help")
+        yield Static("\nPress ? for help\nUse /command in input", classes="help")
 
     def update_state(self) -> None:
         self.commit_status.update_commit_state()
@@ -355,6 +355,8 @@ class AgentApp(App):
         self.sidebar = self.query_one(Sidebar)
         self.set_interval(2.5, self.refresh_state)
         self.refresh_state()
+        # Show welcome help on launch
+        self.action_show_help()
 
     def refresh_state(self) -> None:
         snapshot = load_cycle_snapshot()
@@ -407,9 +409,26 @@ class AgentApp(App):
         tabs.active = "tab-findings"
 
     def action_show_help(self) -> None:
-        self.activity.update_activity(
-            "Commands:\n/commit now | /commit on|off | /cadence 900 | /session start scope=path dur=3600 review=1800 | /session stop"
-        )
+        help_text = """KEYBOARD SHORTCUTS:
+  c = commit now          a = toggle auto-commit    s = start/stop session
+  d = view diff           f = view findings         m = view models
+  k = view API keys       ? = show this help
+
+SLASH COMMANDS (type in input below):
+  /commit now             /commit on               /commit off
+  /cadence 1800           /session start scope=repo dur=3600
+  /session stop           /run                     /analyze
+
+HOW IT WORKS:
+  1. The agent runs in the background (use: brew services start agent)
+  2. It watches for changes and generates patches automatically
+  3. View activity in the center panel, diffs/findings on the right
+  4. Press 'c' to commit when ready, or toggle auto-commit with 'a'
+
+TO START A CYCLE:
+  Type: /run
+  Or from terminal: agent run --max-cycles=1"""
+        self.activity.update_activity(help_text)
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         mapping = {
@@ -417,6 +436,12 @@ class AgentApp(App):
             "btn-toggle-commit": self.action_toggle_auto_commit,
             "btn-session-start": lambda: write_control("session", "start scope=repo"),
             "btn-session-stop": lambda: write_control("session", "stop"),
+            "btn-analyze": lambda: self.handle_command("analyze"),
+            "btn-style": lambda: self.handle_command("task style"),
+            "btn-security": lambda: self.handle_command("task security"),
+            "btn-tests": lambda: self.handle_command("task tests"),
+            "btn-enhance": lambda: self.handle_command("task enhance"),
+            "btn-ui": lambda: self.handle_command("task ui"),
         }
         handler = mapping.get(event.button.id)
         if handler:
@@ -450,6 +475,18 @@ class AgentApp(App):
             write_control("model", parts[1])
         elif name == "apikey" and len(parts) > 1:
             write_control("apikey", " ".join(parts[1:]))
+        elif name in {"run", "start"}:
+            write_control("run_cycle", "now")
+            self.activity.update_activity("Cycle requested. Check activity log for progress...")
+        elif name == "analyze":
+            write_control("task", "analyze")
+            self.activity.update_activity("Analysis task queued...")
+        elif name == "task" and len(parts) > 1:
+            task_name = parts[1]
+            write_control("task", task_name)
+            self.activity.update_activity(f"Task '{task_name}' queued...")
+        elif name == "help":
+            self.action_show_help()
         self.refresh_state()
 
 
