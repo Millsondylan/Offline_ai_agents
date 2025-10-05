@@ -1,0 +1,27 @@
+class Agent < Formula
+  include Language::Python::Virtualenv
+  desc "Always-on offline agent that continuously improves your repo"
+  homepage "https://github.com/YOURORG/agent"
+  url "https://github.com/YOURORG/agent/archive/refs/tags/v0.1.0.tar.gz"
+  sha256 "<FILL_ME>"
+  license "Apache-2.0"
+  depends_on "python@3.12"
+
+  def install
+    virtualenv_install_with_resources
+  end
+
+  service do
+    run [opt_bin/"agent", "--headless", "--cooldown-seconds=0"]
+    keep_alive true
+    environment_variables PATH: std_service_path_env
+    log_path var/"log/agent.log"
+    error_log_path var/"log/agent.err.log"
+  end
+
+  test do
+    system "#{bin}/agent", "--version"
+    system "#{bin}/agent", "run", "--max-cycles=1", "--apply-patches=0"
+  end
+end
+

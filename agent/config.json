@@ -1,0 +1,68 @@
+{
+  "provider": {
+    "type": "command",
+    "manual": {
+      "notes": "Paste prompt.md into 5x/Claude and save returned unified diff to agent/inbox/cycle_<N>.patch"
+    },
+    "command": {
+      "cmd": ["bash", "-lc", "bash agent/local/ollama_provider.sh"],
+      "timeout_seconds": 1200
+    }
+  },
+  "loop": {
+    "max_cycles": 0,
+    "cooldown_seconds": 30,
+    "apply_patches": true,
+    "require_manual_approval": false
+  },
+  "project": {
+    "type": "flutter",
+    "root": "."
+  },
+  "commands": {
+    "analyze": {
+      "enabled": true,
+      "cmd": "cd insightflow_ai_trading && flutter analyze",
+      "timeout_seconds": 600
+    },
+    "test": {
+      "enabled": true,
+      "cmd": "cd insightflow_ai_trading && flutter test -r expanded",
+      "timeout_seconds": 1200
+    },
+    "e2e": {
+      "enabled": false,
+      "cmd": "flutter test integration_test",
+      "timeout_seconds": 1800
+    },
+    "screenshots": {
+      "enabled": true,
+      "cmd": "bash scripts/take_screenshots.sh",
+      "collect_glob": "screenshots/**/*.png",
+      "timeout_seconds": 1800
+    }
+  },
+  "git": {
+    "commit": true,
+    "branch": "agent/auto",
+    "push": false,
+    "open_pr": false,
+    "remote": "origin",
+    "push_interval_seconds": 900
+  },
+  "patch": {
+    "path_prefix": "insightflow_ai_trading/"
+  },
+  "gate": {
+    "min_coverage": 0.8,
+    "ruff_fix": true,
+    "bandit_fail_levels": ["HIGH", "CRITICAL"],
+    "semgrep_rules": ["p/ci", "p/python"],
+    "pip_audit_fix": false,
+    "allow_override": false
+  },
+  "tui": {
+    "refresh_hz": 12,
+    "show_thinking": true
+  }
+}

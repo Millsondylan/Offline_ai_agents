@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR=$(cd "$(dirname "$0")"/.. && pwd)
+LOG_DIR="$ROOT_DIR/run_logs"
+mkdir -p "$LOG_DIR" "$ROOT_DIR/agent/local"
+
+if [ -f "$ROOT_DIR/agent/local/_pid.txt" ] && ps -p "$(cat "$ROOT_DIR/agent/local/_pid.txt")" >/dev/null 2>&1; then
+  echo "agent already running with PID $(cat "$ROOT_DIR/agent/local/_pid.txt")"
+  exit 0
+fi
+
+nohup "$ROOT_DIR/scripts/agent" --headless --cooldown-seconds=0 >"$LOG_DIR/agent.out.log" 2>"$LOG_DIR/agent.err.log" &
+PID=$!
+echo "$PID" > "$ROOT_DIR/agent/local/_pid.txt"
+echo "started agent pid=$PID"
+
