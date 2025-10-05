@@ -32,7 +32,7 @@ if (!platform || !arch) {
 
 const version = pkg.version;
 const assetName = `agent-${platform}-${arch}.tar.gz`;
-const downloadUrl = `https://github.com/YOURORG/agent/releases/download/v${version}/${assetName}`;
+const downloadUrl = `https://github.com/Millsondylan/Offline_ai_agents/releases/download/v${version}/${assetName}`;
 
 const binDir = path.join(__dirname, '..', 'bin');
 fs.mkdirSync(binDir, { recursive: true });

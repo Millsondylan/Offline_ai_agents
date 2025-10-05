@@ -1,5 +1,5 @@
 {
-  "name": "@yourorg/agent",
+  "name": "@millsondylan/agent",
   "version": "0.2.0",
   "description": "Always-on offline-first coding agent packaged for npm",
   "bin": {

@@ -29,6 +29,15 @@ def save_config(cfg: dict) -> None:
     CONFIG_PATH.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
 
 
+def read_json(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
 def write_control(name: str, content: str = "") -> None:
     CONTROL_DIR.mkdir(parents=True, exist_ok=True)
     (CONTROL_DIR / f"{name}.cmd").write_text(content.strip(), encoding="utf-8")
@@ -150,6 +159,55 @@ def run_headless(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_status(_: argparse.Namespace) -> int:
+    commit_meta = read_json(STATE_DIR / "commit_scheduler.json")
+    session_meta = read_json(STATE_DIR / "session.json")
+
+    lines = ["Commit Scheduler"]
+    if commit_meta:
+        auto = "ON" if commit_meta.get("auto_commit", True) else "OFF"
+        lines.append(f"  auto_commit : {auto}")
+        cadence = commit_meta.get("cadence_seconds")
+        if cadence is not None:
+            lines.append(f"  cadence     : {int(cadence)}s")
+        next_at = commit_meta.get("next_commit_at")
+        if next_at:
+            lines.append(f"  next_commit : {int(next_at)}")
+    else:
+        lines.append("  (no scheduler state yet)")
+
+    lines.append("Session")
+    if session_meta:
+        lines.append(f"  status      : {session_meta.get('status', 'idle')}")
+        scope = session_meta.get("active_scope")
+        if scope:
+            lines.append(f"  scope       : {scope}")
+        review_eta = session_meta.get("review_eta")
+        if review_eta:
+            lines.append(f"  review_eta  : {int(review_eta)}")
+    else:
+        lines.append("  (session tracking disabled or not started)")
+
+    print("\n".join(lines))
+    return 0
+
+
+def cmd_help(_: argparse.Namespace) -> int:
+    cheat_sheet = """Agent CLI quick-start:\n\
+  agent                       # launch Textual UI\n\
+  agent --headless            # run loop in current shell\n\
+  agent run --max-cycles=1    # single headless cycle\n\
+  agent status                # show commit/session state\n\
+  agent review <scope> --duration 30m\n\
+  agent commit --now          # force commit if gate passes\n\
+  agent models --pull llama3  # download Ollama model\n\
+  agent apikey set openai sk-***\n\
+  agent exec \"Investigate failing tests\"\n\
+Tip: activate your virtualenv then export PATH=\"$PWD/scripts:$PATH\"."""
+    print(cheat_sheet)
+    return 0
+
+
 def open_tui() -> int:
     try:
         from .view import launch_tui
@@ -174,33 +232,45 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="cmd")
 
+    helper = subparsers.add_parser("help", help="Print common CLI examples")
+    helper.set_defaults(handler=cmd_help)
+
     review = subparsers.add_parser("review", help="Start a timeboxed review session")
     review.add_argument("scope", help="Scope path or topic")
     review.add_argument("--duration", help="Session duration (e.g. 45m)")
     review.add_argument("--post-review", help="Post-review delay (e.g. 120m)")
     review.add_argument("--default-duration", type=int, default=3600)
     review.add_argument("--default-post-review", type=int, default=3600)
+    review.set_defaults(handler=cmd_review)
 
     commit = subparsers.add_parser("commit", help="Control commit scheduler")
     commit.add_argument("--now", action="store_true")
     commit.add_argument("--on", action="store_true")
     commit.add_argument("--off", action="store_true")
     commit.add_argument("--cadence", help="Set cadence (e.g. 1800s, 30m)")
+    commit.set_defaults(handler=cmd_commit)
 
     models = subparsers.add_parser("models", help="List, pull, or switch models")
     models.add_argument("--pull", help="Download a model via ollama", default=None)
     models.add_argument("--switch", help="Set default model", default=None)
+    models.set_defaults(handler=cmd_models)
 
     apikey = subparsers.add_parser("apikey", help="Manage hosted API keys")
     apikey.add_argument("action", choices=["set", "get", "clear"], help="Action to perform")
     apikey.add_argument("name", help="Key identifier (e.g. openai)")
     apikey.add_argument("value", nargs="?", default="", help="Secret value for set")
+    apikey.set_defaults(handler=cmd_apikey)
 
     exec_cmd = subparsers.add_parser("exec", help="Send ad-hoc prompt to provider")
     exec_cmd.add_argument("prompt")
+    exec_cmd.set_defaults(handler=cmd_exec)
 
     run_cmd = subparsers.add_parser("run", help="Run headless loop now")
     run_cmd.add_argument("--max-cycles", type=int, default=None)
+    run_cmd.set_defaults(handler=run_headless)
+
+    status_cmd = subparsers.add_parser("status", help="Show commit/session status")
+    status_cmd.set_defaults(handler=cmd_status)
 
     return parser
 
@@ -214,18 +284,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(__version__)
         return 0
 
-    if args.cmd == "review":
-        return cmd_review(args)
-    if args.cmd == "commit":
-        return cmd_commit(args)
-    if args.cmd == "models":
-        return cmd_models(args)
-    if args.cmd == "apikey":
-        return cmd_apikey(args)
-    if args.cmd == "exec":
-        return cmd_exec(args)
-    if args.cmd == "run":
-        return run_headless(args)
+    if hasattr(args, "handler"):
+        return args.handler(args)
 
     if args.headless:
         return run_headless(args)

@@ -45,14 +45,14 @@ Now `agent` will resolve to the repository launcher instead of any system/brew i
 
 - **Homebrew service (macOS):**
   ```bash
-  brew tap YOURORG/agent
+  brew tap Millsondylan/agent
   brew install agent
   brew services start agent
   ```
   Update `packaging/homebrew/agent.rb` with your release URL + `sha256` before publishing.
 - **npm installer (macOS/Linux):**
   ```bash
-  npm install -g @yourorg/agent   # or: npx @yourorg/agent -- --version
+  npm install -g @millsondylan/agent   # or: npx @millsondylan/agent -- --version
   ```
   The installer downloads a prebuilt binary when it exists and falls back to the Python module otherwise.
 
