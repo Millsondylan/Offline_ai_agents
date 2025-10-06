@@ -13,17 +13,14 @@ for line in version_file.read_text().splitlines():
 setup(
     name="agent",
     version=version,
-    description="Always-on offline-first coding agent with production gates and TUI",
+    description="Modern CLI control panel for autonomous AI agents",
     author="Dylan Millson",
     url="https://github.com/Millsondylan/Offline_ai_agents",
     packages=find_packages(),
     include_package_data=True,
     python_requires=">=3.11",
     install_requires=[
-        "textual",
-        "watchdog",
-        "requests",
-        "keyring",
+        # No external dependencies - uses built-in Python curses
     ],
     extras_require={
         "dev": [
@@ -37,7 +34,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "agent=agent.cli:main",
+            "agent=agent_dashboard.__main__:main",
         ],
     },
     license="Apache-2.0",
