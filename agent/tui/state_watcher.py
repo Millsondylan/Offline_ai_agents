@@ -1,330 +1,314 @@
+"""State watcher that polls agent state files every 500ms."""
 from __future__ import annotations
 
 import json
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-
-
-def _read_json(path: Path) -> Dict[str, Any]:
-    if not path.exists():
-        return {}
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-
-
-def _human_time(seconds: float) -> str:
-    seconds = max(0, int(seconds))
-    hours, remainder = divmod(seconds, 3600)
-    minutes, secs = divmod(remainder, 60)
-    if hours:
-        return f"{hours:d}h {minutes:02d}m {secs:02d}s"
-    if minutes:
-        return f"{minutes:d}m {secs:02d}s"
-    return f"{secs:d}s"
+from typing import Dict, List, Optional
 
 
 @dataclass
 class ControlState:
-    status: str = "IDLE"
-    provider: str = "--"
-    model: str = "--"
-    session_duration: str = "0s"
+    """Control panel state."""
+    status: str = "idle"  # running, paused, stopped, idle
+    provider: str = "unknown"
+    model: str = "unknown"
+    session_duration: int = 0
     cycle_count: int = 0
-    cycle_status: str = "--"
+    cycle_status: str = "idle"
     available_models: List[str] = field(default_factory=list)
 
 
 @dataclass
 class CycleState:
-    cycle_number: str = "cycle_000"
-    phase: str = "waiting"
-    elapsed: str = "0s"
-    estimate: str = "--"
-    fastpath: str = "--"
+    """Current cycle state."""
+    cycle_number: int = 0
+    phase: str = "idle"
+    elapsed_seconds: int = 0
+    estimated_seconds: int = 0
+    fastpath_files: List[str] = field(default_factory=list)
+
+    @property
+    def elapsed(self) -> str:
+        """Formatted elapsed time."""
+        return f"{self.elapsed_seconds}s"
+
+    @property
+    def estimate(self) -> str:
+        """Formatted estimated time."""
+        if self.estimated_seconds > 0:
+            return f"{self.estimated_seconds}s"
+        return "--"
+
+    @property
+    def fastpath(self) -> str:
+        """Formatted fastpath files."""
+        if not self.fastpath_files:
+            return "--"
+        return ", ".join(self.fastpath_files[:3]) + ("..." if len(self.fastpath_files) > 3 else "")
 
 
 @dataclass
 class TaskState:
-    identifier: str
-    title: str
-    status: str
+    """Task in the queue."""
+    id: str
+    name: str
+    status: str  # running, paused, pending, complete
+
+    @property
+    def identifier(self) -> str:
+        """Get task identifier (same as id)."""
+        return self.id
+
+    @property
+    def title(self) -> str:
+        """Get task title (same as name)."""
+        return self.name
 
 
 @dataclass
 class GateState:
+    """Production gate state."""
     name: str
-    status: str
-    summary: str
+    status: str  # passed, failed, running, pending
+    findings_count: int = 0
 
 
 @dataclass
 class ArtifactState:
-    label: str
+    """Artifact file state."""
     path: Path
-    kind: str
+    label: str
+    type: str  # diff, findings, log, config, other
+
+    @property
+    def kind(self) -> str:
+        """Get artifact kind (same as type)."""
+        return self.type
 
 
 @dataclass
 class OutputState:
+    """Output viewer state."""
     diff_text: str = ""
-    findings: List[Dict[str, Any]] = field(default_factory=list)
+    findings: List[Dict] = field(default_factory=list)
     logs: List[str] = field(default_factory=list)
     config_text: str = ""
 
 
 @dataclass
 class StateSnapshot:
-    control: ControlState
-    cycle: CycleState
-    tasks: List[TaskState]
-    gates: List[GateState]
-    artifacts: List[ArtifactState]
-    output: OutputState
+    """Complete state snapshot."""
+    control: ControlState = field(default_factory=ControlState)
+    cycle: CycleState = field(default_factory=CycleState)
+    tasks: List[TaskState] = field(default_factory=list)
+    gates: List[GateState] = field(default_factory=list)
+    artifacts: List[ArtifactState] = field(default_factory=list)
+    output: OutputState = field(default_factory=OutputState)
 
 
 class StateWatcher:
-    """Loads lightweight snapshots of agent state for the TUI."""
+    """Polls agent state files and provides snapshots."""
 
-    def __init__(self) -> None:
-        self.repo_root = Path(__file__).resolve().parent.parent
-        self.state_root = self.repo_root / "state"
-        self.artifact_root = self.repo_root / "artifacts"
-        self.control_root = self.repo_root / "local" / "control"
-        self.config_path = self.repo_root / "config.json"
+    def __init__(self):
+        self.repo_root = Path(__file__).resolve().parent.parent.parent
+        self.state_root = self.repo_root / "agent" / "state"
+        self.artifact_root = self.repo_root / "agent" / "artifacts"
+        self.config_path = self.repo_root / "agent" / "config.json"
 
     def snapshot(self) -> StateSnapshot:
-        cycle_dir = self._latest_cycle()
-        control = self._load_control_state()
-        cycle, diff_text, findings, logs = self._load_cycle_state(cycle_dir)
-        tasks = self._load_tasks()
-        gates = self._load_gates(cycle_dir)
-        artifacts = self._load_artifacts(cycle_dir)
-        config_text = self.config_path.read_text(encoding="utf-8") if self.config_path.exists() else "{}"
-        output = OutputState(diff_text=diff_text, findings=findings, logs=logs, config_text=config_text)
+        """Create a complete state snapshot."""
         return StateSnapshot(
-            control=control,
-            cycle=cycle,
-            tasks=tasks,
-            gates=gates,
-            artifacts=artifacts,
-            output=output,
+            control=self._read_control_state(),
+            cycle=self._read_cycle_state(),
+            tasks=self._read_tasks(),
+            gates=self._read_gates(),
+            artifacts=self._read_artifacts(),
+            output=self._read_output(),
         )
 
-    # ------------------------------------------------------------------
-    # Control panel helpers
-    # ------------------------------------------------------------------
+    def _read_json(self, path: Path) -> Dict:
+        """Read JSON file safely."""
+        if not path.exists():
+            return {}
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
 
-    def _load_control_state(self) -> ControlState:
-        cfg = _read_json(self.config_path)
-        provider_cfg = cfg.get("provider", {})
-        provider_name = provider_cfg.get("name") or provider_cfg.get("provider") or provider_cfg.get("type") or "--"
-        model_name = provider_cfg.get("model") or provider_cfg.get("model_name") or provider_cfg.get("engine") or "--"
-        models = provider_cfg.get("models") or provider_cfg.get("available_models") or []
-        if not models and model_name != "--":
-            models = [model_name]
+    def _read_control_state(self) -> ControlState:
+        """Read control panel state."""
+        session = self._read_json(self.state_root / "session.json")
+        config = self._read_json(self.config_path)
 
-        session_meta = _read_json(self.state_root / "session.json")
-        status = session_meta.get("status", "idle").upper()
-        started_at = session_meta.get("active_started_at")
-        elapsed = _human_time(time.time() - started_at) if started_at else "0s"
-        cycle_count = int(session_meta.get("cycle_count", 0))
-        cycle_status = session_meta.get("active_scope") or "--"
+        status = session.get("status", "idle")
+        provider_data = config.get("provider", {})
+        provider = provider_data.get("type", "unknown")
+        model = provider_data.get("model", "unknown")
+        cycle_count = session.get("cycle_count", 0)
+        duration = session.get("session_duration", 0)
+        cycle_status = session.get("phase", "idle")
+        available_models = config.get("available_models", [])
 
         return ControlState(
             status=status,
-            provider=str(provider_name),
-            model=str(model_name),
-            session_duration=elapsed,
+            provider=provider,
+            model=model,
+            session_duration=duration,
             cycle_count=cycle_count,
-            cycle_status=str(cycle_status),
-            available_models=[str(m) for m in models],
+            cycle_status=cycle_status,
+            available_models=available_models,
         )
 
-    # ------------------------------------------------------------------
-    # Cycle & output helpers
-    # ------------------------------------------------------------------
+    def _read_cycle_state(self) -> CycleState:
+        """Read current cycle state."""
+        session = self._read_json(self.state_root / "session.json")
 
-    def _load_cycle_state(self, cycle_dir: Optional[Path]) -> tuple[CycleState, str, List[Dict[str, Any]], List[str]]:
-        diff_text = ""
-        findings: List[Dict[str, Any]] = []
-        logs: List[str] = []
-        cycle_state = CycleState()
+        cycle_num = session.get("current_cycle", 0)
+        phase = session.get("phase", "idle")
+        elapsed = session.get("elapsed_seconds", 0)
+        estimated = session.get("estimated_seconds", 0)
+        fastpath = session.get("fastpath_files", [])
 
-        if cycle_dir is None:
-            return cycle_state, diff_text, findings, logs
+        return CycleState(
+            cycle_number=cycle_num,
+            phase=phase,
+            elapsed_seconds=elapsed,
+            estimated_seconds=estimated,
+            fastpath_files=fastpath,
+        )
 
-        cycle_state.cycle_number = cycle_dir.name
-        meta = _read_json(cycle_dir / "cycle.meta.json")
-        production_gate = _read_json(cycle_dir / "production_gate.json")
+    def _read_tasks(self) -> List[TaskState]:
+        """Read task queue."""
+        scheduler = self._read_json(self.state_root / "scheduler.json")
+        tasks_data = scheduler.get("tasks", [])
 
-        if meta:
-            cycle_state.phase = meta.get("phase", cycle_state.phase)
-            elapsed = meta.get("elapsed_seconds") or meta.get("duration")
-            if elapsed is not None:
-                cycle_state.elapsed = _human_time(float(elapsed))
-            estimate = meta.get("estimated_total_seconds") or meta.get("eta")
-            if estimate is not None:
-                cycle_state.estimate = _human_time(float(estimate))
-            watched = meta.get("fastpath", {})
-            if isinstance(watched, dict):
-                paths = watched.get("touched_paths") or watched.get("paths") or []
-                if paths:
-                    cycle_state.fastpath = ", ".join(paths[:3]) + ("…" if len(paths) > 3 else "")
+        tasks = []
+        for i, task in enumerate(tasks_data):
+            if isinstance(task, dict):
+                task_id = task.get("id", f"task_{i}")
+                name = task.get("name", "Unnamed task")
+                status = task.get("status", "pending")
             else:
-                value = meta.get("fastpath")
-                if isinstance(value, list):
-                    paths = value
-                    cycle_state.fastpath = ", ".join(map(str, paths[:3])) + ("…" if len(paths) > 3 else "")
-                elif isinstance(value, str):
-                    cycle_state.fastpath = value
+                task_id = f"task_{i}"
+                name = str(task)
+                status = "pending"
 
-        diff_path_candidates = [
-            cycle_dir / "diff.patch",
-            cycle_dir / "applied.patch",
-            cycle_dir / "proposed.patch",
-        ]
-        for candidate in diff_path_candidates:
-            if candidate.exists():
+            tasks.append(TaskState(id=task_id, name=name, status=status))
+
+        return tasks
+
+    def _read_gates(self) -> List[GateState]:
+        """Read production gate states."""
+        latest_cycle = self._get_latest_cycle_dir()
+        if not latest_cycle:
+            return []
+
+        meta = self._read_json(latest_cycle / "cycle.meta.json")
+        gates_data = meta.get("gates", {})
+
+        gates = []
+        for name, info in gates_data.items():
+            status = "passed" if info.get("passed") else "failed"
+            findings = len(info.get("findings", []))
+            gates.append(GateState(name=name, status=status, findings_count=findings))
+
+        return gates
+
+    def _read_artifacts(self) -> List[ArtifactState]:
+        """Read artifact files."""
+        if not self.artifact_root.exists():
+            return []
+
+        artifacts = []
+        for cycle_dir in sorted(self.artifact_root.iterdir(), reverse=True):
+            if not cycle_dir.is_dir():
+                continue
+
+            for file_path in cycle_dir.rglob("*"):
+                if not file_path.is_file():
+                    continue
+
+                rel_path = file_path.relative_to(self.artifact_root)
+                label = str(rel_path)
+
+                # Determine type
+                if file_path.suffix == ".patch" or "diff" in file_path.name:
+                    file_type = "diff"
+                elif file_path.suffix == ".json" and "findings" in file_path.name:
+                    file_type = "findings"
+                elif file_path.suffix == ".log":
+                    file_type = "log"
+                elif file_path.name == "config.json":
+                    file_type = "config"
+                else:
+                    file_type = "other"
+
+                artifacts.append(
+                    ArtifactState(path=file_path, label=label, type=file_type)
+                )
+
+        return artifacts[:50]  # Limit to 50 most recent
+
+    def _read_output(self) -> OutputState:
+        """Read output viewer state."""
+        latest_cycle = self._get_latest_cycle_dir()
+        if not latest_cycle:
+            return OutputState()
+
+        # Read diff
+        diff_text = ""
+        for candidate in ["applied.patch", "proposed.patch", "diff.patch"]:
+            diff_path = latest_cycle / candidate
+            if diff_path.exists():
                 try:
-                    diff_text = candidate.read_text(encoding="utf-8")
+                    diff_text = diff_path.read_text(encoding="utf-8")
                     break
                 except Exception:
                     pass
 
-        findings_path = cycle_dir / "findings.json"
+        # Read findings
+        findings = []
+        findings_path = latest_cycle / "findings.json"
         if findings_path.exists():
-            data = _read_json(findings_path)
-            if isinstance(data, list):
-                findings = data
-            elif isinstance(data, dict):
-                findings = data.get("findings", []) or data.get("results", []) or []
+            findings_data = self._read_json(findings_path)
+            if isinstance(findings_data, list):
+                findings = findings_data
+            elif isinstance(findings_data, dict):
+                findings = findings_data.get("findings", [])
 
-        if production_gate:
-            for analyzer, payload in production_gate.get("results", {}).items():
-                gate_findings = payload.get("findings", [])
-                for entry in gate_findings:
-                    enriched = dict(entry)
-                    enriched["analyzer"] = analyzer
-                    findings.append(enriched)
-
-        log_path = cycle_dir / "agent.log"
-        if not log_path.exists():
-            log_path = cycle_dir / "runtime.log"
+        # Read logs
+        logs = []
+        log_path = latest_cycle / "agent.log"
         if log_path.exists():
             try:
-                lines = log_path.read_text(encoding="utf-8", errors="ignore").splitlines()
-                logs = lines[-400:]
+                logs = log_path.read_text(encoding="utf-8").splitlines()[-100:]
             except Exception:
-                logs = []
+                pass
 
-        return cycle_state, diff_text, findings, logs
+        # Read config
+        config_text = ""
+        if self.config_path.exists():
+            try:
+                config_text = self.config_path.read_text(encoding="utf-8")
+            except Exception:
+                pass
 
-    # ------------------------------------------------------------------
-    # Tasks & gates
-    # ------------------------------------------------------------------
+        return OutputState(
+            diff_text=diff_text,
+            findings=findings,
+            logs=logs,
+            config_text=config_text,
+        )
 
-    def _load_tasks(self) -> List[TaskState]:
-        tasks: List[TaskState] = []
-        scheduler_meta = _read_json(self.state_root / "scheduler.json")
-        tasks_meta = _read_json(self.state_root / "tasks.json")
-        queue_items: List[Dict[str, Any]] = []
-
-        if scheduler_meta:
-            active = scheduler_meta.get("active")
-            if isinstance(active, dict):
-                queue_items.append(active | {"_active": True})
-            for item in scheduler_meta.get("queue", []):
-                if isinstance(item, dict):
-                    queue_items.append(item)
-        elif tasks_meta:
-            for item in tasks_meta.get("tasks", []):
-                if isinstance(item, dict):
-                    queue_items.append(item)
-
-        if not queue_items:
-            return tasks
-
-        for index, item in enumerate(queue_items):
-            name = item.get("name") or item.get("task") or item.get("id") or f"task-{index+1}"
-            status = item.get("status") or ("running" if item.get("_active") else "pending")
-            tasks.append(
-                TaskState(
-                    identifier=str(item.get("id") or name),
-                    title=str(name),
-                    status=str(status),
-                )
-            )
-        return tasks
-
-    def _load_gates(self, cycle_dir: Optional[Path]) -> List[GateState]:
-        gate_states: List[GateState] = []
-        if cycle_dir is None:
-            return gate_states
-
-        production_gate = _read_json(cycle_dir / "production_gate.json")
-        if not production_gate:
-            return gate_states
-
-        for analyzer, payload in production_gate.get("results", {}).items():
-            status = payload.get("status") or ("passed" if payload.get("ok") else "failed")
-            summary = payload.get("summary") or payload.get("message") or ""
-            gate_states.append(GateState(name=str(analyzer), status=str(status), summary=str(summary)))
-        return gate_states
-
-    # ------------------------------------------------------------------
-    # Artifacts
-    # ------------------------------------------------------------------
-
-    def _load_artifacts(self, cycle_dir: Optional[Path]) -> List[ArtifactState]:
-        artifacts: List[ArtifactState] = []
-        if cycle_dir is None:
-            return artifacts
-
-        for path in sorted(cycle_dir.rglob("*")):
-            if not path.is_file():
-                continue
-            rel = path.relative_to(cycle_dir)
-            label = f"{cycle_dir.name}/{rel.as_posix()}"
-            kind = self._classify_artifact(path)
-            artifacts.append(ArtifactState(label=label, path=path, kind=kind))
-        return artifacts
-
-    @staticmethod
-    def _classify_artifact(path: Path) -> str:
-        name = path.name.lower()
-        suffix = path.suffix.lower()
-        if name.endswith("diff.patch") or suffix == ".patch":
-            return "diff"
-        if "finding" in name or suffix in {".json"}:
-            return "findings"
-        if suffix in {".log", ".txt"}:
-            return "log"
-        return "artifact"
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
-    def _latest_cycle(self) -> Optional[Path]:
+    def _get_latest_cycle_dir(self) -> Optional[Path]:
+        """Get the latest cycle directory."""
         if not self.artifact_root.exists():
             return None
-        cycle_dirs = [p for p in self.artifact_root.iterdir() if p.is_dir() and p.name.startswith("cycle_")]
-        if not cycle_dirs:
-            return None
-        return sorted(cycle_dirs)[-1]
 
+        cycle_dirs = [
+            d for d in self.artifact_root.iterdir()
+            if d.is_dir() and d.name.startswith("cycle_")
+        ]
 
-__all__ = [
-    "ControlState",
-    "CycleState",
-    "TaskState",
-    "GateState",
-    "ArtifactState",
-    "OutputState",
-    "StateSnapshot",
-    "StateWatcher",
-]
+        return max(cycle_dirs, default=None) if cycle_dirs else None

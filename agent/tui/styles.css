@@ -1,156 +1,298 @@
-/* Global layout */
+/* TUI Styles for Agent Dashboard */
+
+/* Global styles */
 Screen {
+    background: $surface;
     layout: vertical;
-    background: #101418;
-    color: #d0d4d8;
 }
 
+/* Main layout container */
 #layout-root {
-    layout: grid;
-    grid-rows: 3 12 1fr 1;
-    grid-columns: 1fr;
+    width: 100%;
     height: 100%;
-    gap: 1;
-    padding: 1;
+    layout: vertical;
 }
 
-#row-top,
-#row-middle {
-    gap: 1;
-}
-
+/* Top row: Control + Cycle Info */
 #row-top {
-    layout: horizontal;
-}
-
-#row-middle {
+    height: auto;
     layout: horizontal;
 }
 
 #control-panel {
     width: 40%;
-    border: round $surface-darken-2;
+    height: auto;
+    border: solid $primary;
     padding: 1;
-    background: $panel;
 }
 
 #cycle-info {
     width: 60%;
-    border: round $surface-darken-2;
+    height: auto;
+    border: solid $primary;
     padding: 1;
-    background: $panel;
 }
 
-#task-queue,
-#gate-panel {
+/* Middle row: Tasks + Gates + Artifacts */
+#row-middle {
+    height: 1fr;
+    layout: horizontal;
+}
+
+#task-queue {
     width: 30%;
-    border: round $surface-darken-2;
+    height: 100%;
+    border: solid $secondary;
     padding: 1;
-    background: $panel;
+}
+
+#gate-status {
+    width: 30%;
+    height: 100%;
+    border: solid $secondary;
+    padding: 1;
 }
 
 #artifact-browser {
     width: 40%;
-    border: round $surface-darken-2;
+    height: 100%;
+    border: solid $secondary;
     padding: 1;
-    background: $panel;
 }
 
+/* Output viewer */
 #output-viewer {
-    border: round $surface-darken-2;
+    height: 15;
+    border: solid $accent;
     padding: 1;
-    background: $panel;
-}
-
-#status-bar {
-    border: round $surface-darken-2;
-    padding: 0 1;
-    background: $surface-darken-1;
-    color: $text-muted;
-}
-
-/* Typography */
-Label {
-    text-style: bold;
-}
-
-#status-action {
-    text-style: none;
-    color: $text;
-}
-
-#status-container {
-    layout: horizontal;
-    justify-content: space-between;
-}
-
-/* Navigation buttons */
-Button {
-    height: auto;
-    padding: 0 1;
-    margin: 0 0 1 0;
-    border: solid $surface-darken-1;
-    background: $surface-darken-2;
-    color: $text-muted;
-}
-
-Button:focus {
-    border: double $accent;
-    background: $boost;
-    color: $text;
-    text-style: bold;
-}
-
-#control-buttons {
-    layout: horizontal;
-    gap: 1;
 }
 
 #output-tabs {
-    gap: 1;
-    margin-bottom: 1;
+    height: 1;
+    layout: horizontal;
 }
 
-#diff-actions {
-    gap: 1;
-    margin-top: 1;
+#diff-panel, #findings-panel, #logs-panel, #config-panel {
+    height: 1fr;
+    overflow-y: auto;
+    scrollbar-size: 1 1;
 }
 
-#findings-panel,
-#logs-panel {
-    height: 12;
-    border: solid $surface-darken-1;
+/* Status bar */
+#status-bar {
+    height: 1;
+    background: $boost;
+    color: $text;
+    padding: 0 1;
 }
 
-#config-panel,
-#diff-panel,
-#config-lines {
-    height: 12;
-    border: solid $surface-darken-1;
+/* Navigation focus states */
+.focused {
+    border: heavy $success;
+    background: $boost;
+    text-style: bold;
 }
 
-.dim {
+.focused:hover {
+    background: $warning;
+}
+
+/* Button styles */
+Button {
+    width: auto;
+    height: auto;
+    margin: 0 1;
+}
+
+Button.focused {
+    border: heavy cyan;
+    background: $boost;
+    text-style: bold;
+}
+
+NavigationItem {
+    width: 100%;
+    height: auto;
+    border: none;
+    background: transparent;
+    text-align: left;
+    padding: 0 1;
+}
+
+NavigationItem.focused {
+    border: solid cyan;
+    background: $boost;
+    text-style: bold;
+}
+
+/* Task items */
+.task-item {
+    width: 100%;
+    height: auto;
+    margin: 0 0 1 0;
+}
+
+.task-running {
+    color: $success;
+    text-style: bold;
+}
+
+.task-paused {
+    color: $warning;
+}
+
+.task-pending {
     color: $text-muted;
+}
+
+.task-complete {
+    color: $text-disabled;
+}
+
+/* Gate items */
+.gate-item {
+    width: 100%;
+    height: auto;
+    margin: 0 0 1 0;
+}
+
+.gate-passed {
+    color: $success;
+}
+
+.gate-failed {
+    color: $error;
+}
+
+.gate-running {
+    color: $warning;
+}
+
+.gate-pending {
+    color: $text-muted;
+}
+
+/* Artifact items */
+.artifact-item {
+    width: 100%;
+    height: auto;
+    margin: 0;
+    padding: 0 1;
 }
 
 .artifact-folder {
     text-style: bold;
-    margin-top: 1;
+    color: $accent;
 }
 
-#artifact-container,
-#gates-container,
-#tasks-container {
-    gap: 0;
+.artifact-file {
+    color: $text;
 }
 
-#tasks-container Button,
-#gates-container Button,
-#artifact-container Button {
+/* Tab buttons */
+.tab-button {
+    width: auto;
+    height: 1;
+    border: none;
+    background: transparent;
+    padding: 0 2;
+}
+
+.tab-button.focused {
+    background: $boost;
+    text-style: bold underline;
+}
+
+.tab-active {
+    background: $primary;
+    text-style: bold;
+}
+
+/* Config editor */
+.config-line {
     width: 100%;
+    height: auto;
+    padding: 0 1;
 }
 
-#task-name-input {
+.config-line.focused {
+    background: $boost;
+    text-style: bold;
+}
+
+.config-line-editing {
+    background: $warning;
+    text-style: bold;
+}
+
+/* Status indicators */
+.status-running {
+    color: $success;
+    text-style: bold;
+}
+
+.status-paused {
+    color: $warning;
+    text-style: bold;
+}
+
+.status-stopped {
+    color: $error;
+    text-style: bold;
+}
+
+.status-idle {
+    color: $text-muted;
+}
+
+/* Help text */
+.help-text {
+    color: $text-muted;
+    text-style: italic;
+}
+
+/* Action hint */
+.action-hint {
+    color: $accent;
+    text-style: bold;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+    width: 1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: $primary;
+}
+
+::-webkit-scrollbar-track {
+    background: $surface;
+}
+
+/* Log viewer */
+Log {
+    height: 100%;
+    border: none;
+}
+
+/* Syntax highlighting for diffs */
+.diff-add {
+    color: $success;
+}
+
+.diff-remove {
+    color: $error;
+}
+
+.diff-context {
+    color: $text-muted;
+}
+
+/* Panel titles */
+.panel-title {
+    text-style: bold;
+    color: $accent;
+    text-align: center;
     width: 100%;
-    border: solid $accent;
 }

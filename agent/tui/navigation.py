@@ -1,165 +1,115 @@
+"""Navigation system for arrow-key-only TUI control."""
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Sequence
+from typing import Callable, Optional, List, TYPE_CHECKING
 
-from textual import events
-from textual.app import App
-from textual.message import Message
-from textual.widget import Widget
 from textual.widgets import Button
+
+if TYPE_CHECKING:
+    from textual.app import App
+    from textual.widget import Widget
 
 
 @dataclass
 class NavEntry:
-    """Represents a focusable element in the global navigation chain."""
-
+    """A focusable element in the navigation chain."""
     widget_id: str
-    action: str
-
-
-class NavigationHint(Message):
-    """Posted by widgets when the focus changes to update the status bar."""
-
-    def __init__(self, widget: "NavigationItem") -> None:
-        super().__init__()
-        self.widget = widget
-        self.action = widget.enter_action
+    action: Optional[str] = None  # Description of what ENTER does
 
 
 class NavigationItem(Button):
-    """Base button with arrow-navigation styling and focus indication."""
+    """A focusable button widget that supports navigation and action execution."""
 
-    def __init__(
-        self,
-        label: str,
-        action: str,
-        *,
-        id: Optional[str] = None,
-        classes: Optional[str] = None,
-    ) -> None:
-        super().__init__(label=label, id=id, classes=classes)
+    def __init__(self, label: str, action: str, **kwargs) -> None:
+        super().__init__(label, **kwargs)
         self.enter_action = action
-        self._base_label = label
-        self._focused = False
-        self._render_label()
 
     def set_display(self, label: str) -> None:
-        self._base_label = label
-        self._render_label()
+        """Update button label."""
+        self.label = label
 
     def handle_enter(self) -> None:
-        """Default ENTER handler simply presses the button."""
-        self.press()
+        """Execute the action when ENTER is pressed. Override in subclasses."""
+        pass
 
-    def on_focus(self, event: events.Focus) -> None:  # type: ignore[override]
-        super().on_focus(event)
-        self._focused = True
-        self._render_label()
-        self.post_message(NavigationHint(self))
-
-    def on_blur(self, event: events.Blur) -> None:  # type: ignore[override]
-        super().on_blur(event)
-        self._focused = False
-        self._render_label()
-
-    def _render_label(self) -> None:
-        prefix = "►" if self._focused else " "
-        self.label = f"{prefix} {self._base_label}"
+    def on_activate(self) -> None:
+        """Called when the button is activated (clicked or ENTER pressed)."""
+        self.handle_enter()
 
 
 class NavigationManager:
-    """Maintains deterministic UP/DOWN focus order across the entire UI."""
+    """Manages arrow-key navigation through focusable elements."""
 
     def __init__(
         self,
         app: App,
-        *,
-        on_focus_change: Optional[Callable[[Optional[NavEntry]], None]] = None,
-    ) -> None:
-        self._app = app
-        self._entries: List[NavEntry] = []
-        self._index: int = 0
-        self._on_focus_change = on_focus_change
+        on_focus_change: Optional[Callable[[Optional[NavEntry]], None]] = None
+    ):
+        self.app = app
+        self.entries: List[NavEntry] = []
+        self.current_index = 0
+        self.on_focus_change = on_focus_change
 
-    def set_entries(self, entries: Sequence[NavEntry]) -> None:
-        filtered: List[NavEntry] = []
-        for entry in entries:
-            if self._resolve_widget(entry.widget_id) is not None:
-                filtered.append(entry)
-        self._entries = filtered
-        if not self._entries:
-            self._notify_focus(None)
-            return
-        current_id = self._current_focus_id()
-        existing = self._index_of(current_id) if current_id else None
-        if existing is None:
-            self._index = max(0, min(self._index, len(self._entries) - 1))
-            self.focus_index(self._index)
-        else:
-            self._index = existing
-            self._notify_focus(self._entries[self._index])
+    def set_entries(self, entries: List[NavEntry]) -> None:
+        """Update the navigation chain."""
+        self.entries = entries
+        if self.current_index >= len(entries):
+            self.current_index = 0
 
     def focus_next(self) -> None:
-        if not self._entries:
+        """Move focus to next element (wraps to top)."""
+        if not self.entries:
             return
-        self._index = (self._index + 1) % len(self._entries)
-        self.focus_index(self._index)
+        self.current_index = (self.current_index + 1) % len(self.entries)
+        self._apply_focus()
 
     def focus_previous(self) -> None:
-        if not self._entries:
+        """Move focus to previous element (wraps to bottom)."""
+        if not self.entries:
             return
-        self._index = (self._index - 1) % len(self._entries)
-        self.focus_index(self._index)
+        self.current_index = (self.current_index - 1) % len(self.entries)
+        self._apply_focus()
 
-    def focus_index(self, index: int) -> None:
-        if not self._entries:
-            return
-        index %= len(self._entries)
-        entry = self._entries[index]
-        widget = self._resolve_widget(entry.widget_id)
-        if widget is None:
-            return
-        self._index = index
-        self._app.set_focus(widget)
-        self._notify_focus(entry)
+    def get_focused(self) -> Optional[NavEntry]:
+        """Get currently focused navigation entry."""
+        if not self.entries or self.current_index >= len(self.entries):
+            return None
+        return self.entries[self.current_index]
 
     def activate_focused(self) -> None:
-        widget = self._app.focused
-        if widget is None:
+        """Execute the action for the currently focused element."""
+        entry = self.get_focused()
+        if not entry:
             return
-        if hasattr(widget, "handle_enter"):
-            getattr(widget, "handle_enter")()  # type: ignore[misc]
-        elif hasattr(widget, "press"):
-            widget.press()  # type: ignore[attr-defined]
 
-    def _current_focus_id(self) -> Optional[str]:
-        focused = self._app.focused
-        if focused is None:
-            return None
-        return getattr(focused, "id", None)
+        widget = self.app.query_one(f"#{entry.widget_id}")
+        if hasattr(widget, "on_activate"):
+            widget.on_activate()
 
-    def _index_of(self, widget_id: Optional[str]) -> Optional[int]:
-        if widget_id is None:
-            return None
-        for idx, entry in enumerate(self._entries):
-            if entry.widget_id == widget_id:
-                return idx
-        return None
+    def _apply_focus(self) -> None:
+        """Apply focus styling to current element."""
+        # Remove focus from all
+        for entry in self.entries:
+            try:
+                widget = self.app.query_one(f"#{entry.widget_id}")
+                widget.remove_class("focused")
+            except Exception:
+                pass
 
-    def _resolve_widget(self, widget_id: str) -> Optional[Widget]:
-        for node in self._app.query(f"#{widget_id}"):
-            return node
-        return None
-
-    def _notify_focus(self, entry: Optional[NavEntry]) -> None:
-        if self._on_focus_change is not None:
-            self._on_focus_change(entry)
+        # Add focus to current
+        entry = self.get_focused()
+        if entry:
+            try:
+                widget = self.app.query_one(f"#{entry.widget_id}")
+                widget.add_class("focused")
+                if self.on_focus_change:
+                    self.on_focus_change(entry)
+            except Exception:
+                pass
 
 
-__all__ = [
-    "NavEntry",
-    "NavigationHint",
-    "NavigationItem",
-    "NavigationManager",
-]
+class NavigationHint:
+    """Message posted when navigation hint should be updated."""
+    def __init__(self, action: Optional[str]):
+        self.action = action

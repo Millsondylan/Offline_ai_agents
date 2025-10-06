@@ -7,7 +7,7 @@ from rich.syntax import Syntax
 
 from textual import events
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Static, TextLog
+from textual.widgets import Static, Log
 
 from ..navigation import NavEntry, NavigationItem
 from ..state_watcher import ArtifactState
@@ -100,8 +100,8 @@ class OutputViewer(Static):
         super().__init__(id="output-viewer")
         self.tabs_row = Horizontal(id="output-tabs")
         self.diff_panel = Static(id="diff-panel")
-        self.findings_panel = TextLog(id="findings-panel")
-        self.logs_panel = TextLog(id="logs-panel")
+        self.findings_panel = Log(id="findings-panel")
+        self.logs_panel = Log(id="logs-panel")
         self.config_panel = Static(id="config-panel")
         self.config_lines_container = Vertical(id="config-lines")
         self.config_lines_container.display = False
