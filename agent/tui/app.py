@@ -1,496 +1,205 @@
 from __future__ import annotations
 
 import json
-import os
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
-from ..providers import KeyStore
+from textual import events
+from textual.app import App, ComposeResult
+from textual.containers import Horizontal, Vertical
 
-try:
-    from textual import events
-    from textual.app import App, ComposeResult
-    from textual.binding import Binding
-    from textual.containers import Container, Horizontal, Vertical
-    from textual.widgets import (
-        Button,
-        Footer,
-        Header,
-        Input,
-        Label,
-        Static,
-        TabPane,
-        TabbedContent,
-        TextLog,
-        DataTable,
-        Tree,
-    )
-    from textual.reactive import reactive
-    from textual.message import Message
-except Exception as exc:  # pragma: no cover - textual optional
-    raise RuntimeError("Textual is required for the agent TUI. Install with `pip install textual`." ) from exc
-
-from rich.syntax import Syntax
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-ARTIFACT_ROOT = REPO_ROOT / "artifacts"
-STATE_ROOT = REPO_ROOT / "state"
-LOCAL_CONTROL = REPO_ROOT / "local" / "control"
-CONFIG_PATH = REPO_ROOT / "config.json"
+from .navigation import NavEntry, NavigationHint, NavigationManager
+from .state_watcher import ArtifactState, StateWatcher
+from .widgets.artifact_browser import ArtifactBrowser
+from .widgets.cycle_info import CycleInfoPanel
+from .widgets.gate_status import GateStatusPanel
+from .widgets.control_panel import ControlPanel
+from .widgets.output_viewer import OutputViewer
+from .widgets.status_bar import StatusBar
+from .widgets.task_queue import TaskQueue
 
 
-@dataclass
-class GateSummary:
-    status: str
-    summary: str
-    findings: List[Dict]
+class AgentTUI(App[None]):
+    """Main Textual application orchestrating the autonomous agent dashboard."""
 
+    CSS_PATH = Path(__file__).with_name("styles.css")
 
-@dataclass
-class CycleSnapshot:
-    path: Optional[Path]
-    meta: Dict
-    gate: Optional[GateSummary]
-    diff: str
-    activity: str
-    artifacts: List[Path]
+    def __init__(self) -> None:
+        super().__init__()
+        self.state_watcher = StateWatcher()
+        self.navigation = NavigationManager(self, on_focus_change=self._on_focus_change)
+        self.control_panel = ControlPanel()
+        self.cycle_panel = CycleInfoPanel()
+        self.task_queue = TaskQueue()
+        self.gate_panel = GateStatusPanel()
+        self.artifact_browser = ArtifactBrowser()
+        self.output_viewer = OutputViewer()
+        self.status_bar = StatusBar()
+        self._status_timer = None
+        self.control_root = Path(__file__).resolve().parent.parent / "local" / "control"
+        self.config_path = Path(__file__).resolve().parent.parent / "config.json"
 
-
-def read_json(path: Path) -> Dict:
-    if not path.exists():
-        return {}
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-
-
-def latest_cycle_dir() -> Optional[Path]:
-    if not ARTIFACT_ROOT.exists():
-        return None
-    cycle_dirs = sorted(d for d in ARTIFACT_ROOT.iterdir() if d.is_dir())
-    return cycle_dirs[-1] if cycle_dirs else None
-
-
-def load_cycle_snapshot() -> CycleSnapshot:
-    cycle_dir = latest_cycle_dir()
-    meta = read_json((cycle_dir or Path()) / "cycle.meta.json") if cycle_dir else {}
-    gate_data = read_json((cycle_dir or Path()) / "production_gate.json") if cycle_dir else {}
-    gate_summary = None
-    if gate_data:
-        findings = []
-        for res_name, res in gate_data.get("results", {}).items():
-            for finding in res.get("findings", []):
-                row = dict(finding)
-                row["analyzer"] = res_name
-                findings.append(row)
-        gate_summary = GateSummary(
-            status="allow" if gate_data.get("allow") else "blocked",
-            summary=", ".join(gate_data.get("rationale", [])) or "clean",
-            findings=findings,
-        )
-    diff_text = ""
-    if cycle_dir:
-        for candidate in [cycle_dir / "applied.patch", cycle_dir / "proposed.patch"]:
-            if candidate.exists():
-                diff_text = candidate.read_text(encoding="utf-8")
-                break
-    activity_parts: List[str] = []
-    if cycle_dir:
-        for name in ["prompt.md", "provider_output.txt", "apply_patch.log", "fast_path.log"]:
-            path = cycle_dir / name
-            if path.exists():
-                text = path.read_text(encoding="utf-8", errors="ignore")
-                activity_parts.append(f"[{name}]\n{text[:4000]}")
-    activity_text = "\n\n".join(activity_parts) if activity_parts else "Waiting for activity..."
-    artifacts = []
-    if cycle_dir:
-        for path in cycle_dir.rglob("*"):
-            if path.is_file():
-                artifacts.append(path)
-    return CycleSnapshot(
-        path=cycle_dir,
-        meta=meta,
-        gate=gate_summary,
-        diff=diff_text,
-        activity=activity_text,
-        artifacts=artifacts,
-    )
-
-
-def write_control(name: str, content: str = "") -> None:
-    LOCAL_CONTROL.mkdir(parents=True, exist_ok=True)
-    target = LOCAL_CONTROL / f"{name}.cmd"
-    target.write_text(content.strip(), encoding="utf-8")
-
-
-class ActivityPanel(TextLog):
-    def update_activity(self, text: str) -> None:
-        self.clear()
-        for line in text.splitlines():
-            self.write(line)
-
-
-class DiffPanel(Static):
-    def update_diff(self, diff_text: str) -> None:
-        if not diff_text:
-            self.update("No diff available yet.")
-            return
-        syntax = Syntax(diff_text, "diff", theme="ansi_dark", line_numbers=False)
-        self.update(syntax)
-
-
-class FindingsPanel(DataTable):
-    columns_defined = False
-
-    def update_findings(self, gate: Optional[GateSummary]) -> None:
-        if not self.columns_defined:
-            self.clear(columns=True)
-            self.add_columns("Analyzer", "Severity", "Message", "Path", "Line")
-            self.columns_defined = True
-        self.clear(rows=True)
-        if not gate or not gate.findings:
-            self.add_row("-", "-", "No findings", "", "")
-            return
-        for item in gate.findings:
-            self.add_row(
-                item.get("analyzer", ""),
-                item.get("severity", ""),
-                item.get("message", ""),
-                item.get("path", ""),
-                str(item.get("line", "")),
-            )
-
-
-class ArtifactTree(Tree):
-    def update_artifacts(self, artifacts: List[Path], base: Optional[Path]) -> None:
-        if not base:
-            self.root.label = "No cycles yet"
-            self.root.children.clear()
-            return
-        self.root.label = base.name
-        self.root.children.clear()
-        for path in artifacts:
-            try:
-                rel = path.relative_to(base)
-            except ValueError:
-                rel = path
-            self.root.add(str(rel))
-        self.root.expand_all()
-
-
-class ConfigPanel(Static):
-    def update_config(self) -> None:
-        if CONFIG_PATH.exists():
-            self.update(CONFIG_PATH.read_text(encoding="utf-8"))
-        else:
-            self.update("config.json missing")
-
-
-class CommitStatus(Static):
-    auto_commit = reactive(True)
-    cadence = reactive(3600)
-
-    def update_commit_state(self) -> None:
-        meta = read_json(STATE_ROOT / "commit_scheduler.json")
-        self.auto_commit = bool(meta.get("auto_commit", True))
-        self.cadence = int(meta.get("cadence_seconds", 3600))
-        next_at = meta.get("next_commit_at")
-        summary = f"Auto-commit: {'ON' if self.auto_commit else 'OFF'} | Cadence: {self.cadence}s"
-        if next_at:
-            summary += f" | Next: {next_at:.0f}"
-        self.update(summary)
-
-
-class SessionStatus(Static):
-    def update_session(self) -> None:
-        meta = read_json(STATE_ROOT / "session.json")
-        if not meta:
-            self.update("Session: inactive")
-            return
-        scope = meta.get("active_scope")
-        status = meta.get("status", "idle")
-        self.update(f"Session: {status} ({scope or 'none'})")
-
-
-class Sidebar(Vertical):
-    def compose(self) -> ComposeResult:
-        yield Label("Tasks", id="sidebar-title")
-        yield Button("Analyze", id="btn-analyze")
-        yield Button("Fix Style", id="btn-style")
-        yield Button("Fix Security", id="btn-security")
-        yield Button("Run Tests", id="btn-tests")
-        yield Button("Enhance Codebase", id="btn-enhance")
-        yield Button("UI Audits", id="btn-ui")
-        yield Static("\nCommit & Sessions", classes="section-title")
-        self.commit_status = CommitStatus(id="commit-status")
-        yield self.commit_status
-        self.session_status = SessionStatus(id="session-status")
-        yield self.session_status
-        yield Button("Commit Now", id="btn-commit-now")
-        yield Button("Toggle Auto-Commit", id="btn-toggle-commit")
-        yield Button("Start Session", id="btn-session-start")
-        yield Button("Stop Session", id="btn-session-stop")
-        yield Static("\nPress ? for help\nUse /command in input", classes="help")
-
-    def update_state(self) -> None:
-        self.commit_status.update_commit_state()
-        self.session_status.update_session()
-
-
-class ModelsPanel(Static):
-    def update_models(self) -> None:
-        cfg = read_json(CONFIG_PATH)
-        provider = cfg.get("provider", {})
-        lines = ["Provider configuration:"]
-        if provider:
-            lines.append(json.dumps(provider, indent=2))
-        else:
-            lines.append("No provider configured")
-        self.update("\n".join(lines))
-
-
-class ApiKeyPanel(Static):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.keystore = KeyStore()
-
-    def update_keys(self) -> None:
-        cfg = read_json(CONFIG_PATH)
-        provider = cfg.get("provider", {})
-        keys = []
-        if provider.get("type") == "api":
-            api_cfg = provider.get("api", {})
-            key_id = api_cfg.get("key_id", api_cfg.get("backend", "api"))
-            secret = self.keystore.get(key_id)
-            keys.append((key_id, secret is not None))
-        else:
-            for name in ("openai", "anthropic", "azure"):
-                secret = self.keystore.get(name)
-                if secret:
-                    keys.append((name, True))
-        if not keys:
-            self.update("No API keys stored.")
-            return
-        display = [f"{name}: {'set' if present else 'missing'}" for name, present in keys]
-        self.update("\n".join(display))
-
-class AgentApp(App):
-    CSS = """
-    Screen {
-        layout: vertical;
-    }
-    #view {
-    }
-    #main-container {
-        height: 1fr;
-    }
-    Vertical.sidebar {
-        width: 32;
-        background: $panel-darken-2;
-        padding: 1 1;
-        border: tall $secondary;
-    }
-    Vertical.sidebar Button {
-        margin: 0 0 1 0;
-    }
-    #activity-log {
-        border: tall $accent;
-    }
-    #command-input {
-        dock: bottom;
-    }
-    TabbedContent {
-        height: 1fr;
-    }
-    """
-
-    BINDINGS = [
-        Binding("c", "commit_now", "Commit Now"),
-        Binding("a", "toggle_auto_commit", "Auto-Commit"),
-        Binding("s", "toggle_session", "Start/Stop Session"),
-        Binding("d", "open_diff", "Diff"),
-        Binding("f", "open_findings", "Findings"),
-        Binding("g", "open_findings", "Gate"),
-        Binding("m", "open_models", "Models"),
-        Binding("k", "open_keys", "API Keys"),
-        Binding("u", "open_ui", "UI Audits"),
-        Binding("?", "show_help", "Help"),
-    ]
+    # ------------------------------------------------------------------
+    # Layout
+    # ------------------------------------------------------------------
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=True)
-        container = Horizontal(id="main-container")
-        container.mount(Sidebar(classes="sidebar"))
-        center = Vertical()
-        self.activity = ActivityPanel(id="activity-log")
-        center.mount(Label("Thinking & Actions", id="center-title"))
-        center.mount(self.activity)
-        container.mount(center)
-        right = Vertical(id="right-pane")
-        self.diff_panel = DiffPanel()
-        self.findings_panel = FindingsPanel()
-        self.artifacts_panel = ArtifactTree("Artifacts")
-        self.config_panel = ConfigPanel()
-        self.models_panel = ModelsPanel()
-        self.keys_panel = ApiKeyPanel()
-        right.mount(
-            TabbedContent(
-                TabPane("Diff", self.diff_panel, id="tab-diff"),
-                TabPane("Findings", self.findings_panel, id="tab-findings"),
-                TabPane("Artifacts", self.artifacts_panel, id="tab-artifacts"),
-                TabPane("Config", self.config_panel, id="tab-config"),
-                TabPane("Models", self.models_panel, id="tab-models"),
-                TabPane("API Keys", self.keys_panel, id="tab-keys"),
-            )
+        yield Vertical(
+            Horizontal(self.control_panel, self.cycle_panel, id="row-top"),
+            Horizontal(self.task_queue, self.gate_panel, self.artifact_browser, id="row-middle"),
+            self.output_viewer,
+            self.status_bar,
+            id="layout-root",
         )
-        container.mount(right)
-        yield container
-        self.command_input = Input(placeholder="Type /command and press Enter", id="command-input")
-        yield self.command_input
-        yield Footer()
 
-    def on_mount(self) -> None:
-        self.sidebar = self.query_one(Sidebar)
-        self.set_interval(2.5, self.refresh_state)
-        self.refresh_state()
-        # Show welcome help on launch
-        self.action_show_help()
+    async def on_mount(self) -> None:
+        await self.poll_state()
+        self.set_interval(0.5, self.poll_state)
+        self.rebuild_navigation()
 
-    def refresh_state(self) -> None:
-        snapshot = load_cycle_snapshot()
-        self.sidebar.update_state()
-        self.activity.update_activity(snapshot.activity)
-        self.diff_panel.update_diff(snapshot.diff)
-        self.findings_panel.update_findings(snapshot.gate)
-        self.artifacts_panel.update_artifacts(snapshot.artifacts, snapshot.path)
-        self.config_panel.update_config()
-        self.models_panel.update_models()
-        self.keys_panel.update_keys()
+    # ------------------------------------------------------------------
+    # Input & navigation handling
+    # ------------------------------------------------------------------
 
-    def action_commit_now(self) -> None:
-        write_control("commit_now", "now")
-        self.bell()
+    async def on_key(self, event: events.Key) -> None:  # type: ignore[override]
+        if event.key == "down":
+            event.stop()
+            self.navigation.focus_next()
+        elif event.key == "up":
+            event.stop()
+            self.navigation.focus_previous()
+        elif event.key == "enter":
+            event.stop()
+            self.navigation.activate_focused()
+        elif event.key == "escape":
+            event.stop()
+            self.stop_agent()
+            self.exit()
 
-    def action_toggle_auto_commit(self) -> None:
-        meta = read_json(STATE_ROOT / "commit_scheduler.json")
-        enabled = not bool(meta.get("auto_commit", True))
-        write_control("auto_commit", "on" if enabled else "off")
-        self.refresh_state()
+    async def on_navigation_hint(self, message: NavigationHint) -> None:
+        self.status_bar.update_action(message.action)
 
-    def action_toggle_session(self) -> None:
-        meta = read_json(STATE_ROOT / "session.json")
-        status = meta.get("status") if meta else "idle"
-        if status == "running":
-            write_control("session", "stop")
-        else:
-            write_control("session", "start scope=repo")
-        self.refresh_state()
+    def _on_focus_change(self, entry: Optional[NavEntry]) -> None:
+        self.status_bar.update_action(entry.action if entry else None)
 
-    def action_open_diff(self) -> None:
-        tabs = self.query_one(TabbedContent)
-        tabs.active = "tab-diff"
+    def _build_navigation_order(self) -> List[NavEntry]:
+        entries: List[NavEntry] = []
+        buttons = [
+            self.control_panel.pause_button,
+            self.control_panel.stop_button,
+            self.control_panel.model_button,
+            self.control_panel.commit_button,
+        ]
+        for button in buttons:
+            if button.id:
+                entries.append(NavEntry(widget_id=button.id, action=button.enter_action))
+        entries.extend(self.task_queue.nav_entries())
+        entries.extend(self.gate_panel.nav_entries())
+        entries.extend(self.artifact_browser.nav_entries())
+        entries.extend(self.output_viewer.nav_entries())
+        return entries
 
-    def action_open_findings(self) -> None:
-        tabs = self.query_one(TabbedContent)
-        tabs.active = "tab-findings"
+    def rebuild_navigation(self) -> None:
+        self.navigation.set_entries(self._build_navigation_order())
 
-    def action_open_models(self) -> None:
-        tabs = self.query_one(TabbedContent)
-        tabs.active = "tab-models"
+    # ------------------------------------------------------------------
+    # State polling & updates
+    # ------------------------------------------------------------------
 
-    def action_open_keys(self) -> None:
-        tabs = self.query_one(TabbedContent)
-        tabs.active = "tab-keys"
+    async def poll_state(self) -> None:
+        snapshot = self.state_watcher.snapshot()
+        self.control_panel.update_state(snapshot.control)
+        self.cycle_panel.update_state(snapshot.cycle)
+        self.task_queue.update_tasks(snapshot.tasks)
+        self.gate_panel.update_gates(snapshot.gates)
+        self.artifact_browser.update_artifacts(snapshot.artifacts)
+        self.output_viewer.update_diff(snapshot.output.diff_text)
+        self.output_viewer.update_findings(snapshot.output.findings)
+        self.output_viewer.update_logs(snapshot.output.logs)
+        self.output_viewer.update_config(snapshot.output.config_text)
+        self.rebuild_navigation()
 
-    def action_open_ui(self) -> None:
-        tabs = self.query_one(TabbedContent)
-        tabs.active = "tab-findings"
+    # ------------------------------------------------------------------
+    # Control helpers
+    # ------------------------------------------------------------------
 
-    def action_show_help(self) -> None:
-        help_text = """KEYBOARD SHORTCUTS:
-  c = commit now          a = toggle auto-commit    s = start/stop session
-  d = view diff           f = view findings         m = view models
-  k = view API keys       ? = show this help
+    def pause_agent(self) -> None:
+        self._write_control("pause")
+        self.show_status("Pause command sent")
 
-SLASH COMMANDS (type in input below):
-  /commit now             /commit on               /commit off
-  /cadence 1800           /session start scope=repo dur=3600
-  /session stop           /run                     /analyze
+    def resume_agent(self) -> None:
+        self._write_control("resume")
+        self.show_status("Resume command sent")
 
-HOW IT WORKS:
-  1. The agent runs in the background (use: brew services start agent)
-  2. It watches for changes and generates patches automatically
-  3. View activity in the center panel, diffs/findings on the right
-  4. Press 'c' to commit when ready, or toggle auto-commit with 'a'
+    def stop_agent(self) -> None:
+        self._write_control("stop")
+        self.show_status("Stop command sent")
 
-TO START A CYCLE:
-  Type: /run
-  Or from terminal: agent run --max-cycles=1"""
-        self.activity.update_activity(help_text)
+    def force_commit(self) -> None:
+        self._write_control("commit")
+        self.show_status("Force commit command sent")
 
-    async def on_button_pressed(self, event: Button.Pressed) -> None:
-        mapping = {
-            "btn-commit-now": self.action_commit_now,
-            "btn-toggle-commit": self.action_toggle_auto_commit,
-            "btn-session-start": lambda: write_control("session", "start scope=repo"),
-            "btn-session-stop": lambda: write_control("session", "stop"),
-            "btn-analyze": lambda: self.handle_command("analyze"),
-            "btn-style": lambda: self.handle_command("task style"),
-            "btn-security": lambda: self.handle_command("task security"),
-            "btn-tests": lambda: self.handle_command("task tests"),
-            "btn-enhance": lambda: self.handle_command("task enhance"),
-            "btn-ui": lambda: self.handle_command("task ui"),
-        }
-        handler = mapping.get(event.button.id)
-        if handler:
-            handler()
-            self.refresh_state()
+    def switch_model(self, model: str) -> None:
+        safe = model.lower().replace(" ", "_")
+        self._write_control(f"switch_model_{safe}")
+        self.show_status(f"Switching model to {model}")
 
-    async def on_input_submitted(self, event: Input.Submitted) -> None:
-        text = (event.value or "").strip()
-        self.command_input.value = ""
-        if not text.startswith("/"):
-            return
-        self.handle_command(text[1:])
-        self.refresh_state()
+    def toggle_task(self, task_id: str) -> None:
+        payload = f"toggle {task_id}"
+        self._write_control("task_control", payload)
+        self.show_status(f"Toggled task {task_id}")
 
-    def handle_command(self, command: str) -> None:
-        parts = command.split()
-        if not parts:
-            return
-        name = parts[0]
-        if name == "commit" and len(parts) > 1:
-            if parts[1] == "now":
-                self.action_commit_now()
-            elif parts[1] in {"on", "off"}:
-                write_control("auto_commit", parts[1])
-        elif name == "cadence" and len(parts) > 1:
-            write_control("cadence", parts[1])
-        elif name == "session":
-            payload = " ".join(parts[1:]) or "start scope=repo"
-            write_control("session", payload)
-        elif name == "model" and len(parts) > 1:
-            write_control("model", parts[1])
-        elif name == "apikey" and len(parts) > 1:
-            write_control("apikey", " ".join(parts[1:]))
-        elif name in {"run", "start"}:
-            write_control("run_cycle", "now")
-            self.activity.update_activity("Cycle requested. Check activity log for progress...")
-        elif name == "analyze":
-            write_control("task", "analyze")
-            self.activity.update_activity("Analysis task queued...")
-        elif name == "task" and len(parts) > 1:
-            task_name = parts[1]
-            write_control("task", task_name)
-            self.activity.update_activity(f"Task '{task_name}' queued...")
-        elif name == "help":
-            self.action_show_help()
-        self.refresh_state()
+    def create_task(self, task_name: str) -> None:
+        self._write_control("add_task", task_name)
+        self.show_status(f"Queued task: {task_name}")
+
+    def apply_all_diffs(self) -> None:
+        self._write_control("apply_all_diffs")
+        self.show_status("Applying all diffs…")
+
+    def reject_all_diffs(self) -> None:
+        self._write_control("reject_all_diffs")
+        self.show_status("Rejecting all diffs…")
+
+    def select_gate(self, gate_name: str) -> None:
+        self.output_viewer.filter_findings(gate_name)
+        self.output_viewer.select_tab("findings")
+        self.show_status(f"Viewing findings for {gate_name}")
+
+    def open_artifact(self, artifact: ArtifactState) -> None:
+        try:
+            self.output_viewer.load_artifact(artifact)
+            self.show_status(f"Opened {artifact.label}")
+        except Exception as exc:  # pragma: no cover - defensive
+            self.show_status(f"Failed to open artifact: {exc}")
+
+    def save_config(self, config: dict) -> None:
+        text = json.dumps(config, indent=2, sort_keys=True)
+        self.config_path.write_text(text, encoding="utf-8")
+        self.output_viewer.update_config(text)
+        self.show_status("Config saved")
+
+    # ------------------------------------------------------------------
+    # Utility
+    # ------------------------------------------------------------------
+
+    def _write_control(self, name: str, content: str = "") -> None:
+        self.control_root.mkdir(parents=True, exist_ok=True)
+        path = self.control_root / f"{name}.cmd"
+        path.write_text(content, encoding="utf-8")
+
+    def show_status(self, message: str, duration: float = 3.0) -> None:
+        self.status_bar.update_action(message)
+        if self._status_timer is not None:
+            self._status_timer.stop()
+        self._status_timer = self.set_timer(duration, self._reset_status)
+
+    def _reset_status(self) -> None:
+        self.status_bar.update_action(None)
+        self._status_timer = None
 
 
 def launch_app() -> int:
-    app = AgentApp()
+    app = AgentTUI()
     app.run()
     return 0

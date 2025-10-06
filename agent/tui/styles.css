@@ -1,0 +1,156 @@
+/* Global layout */
+Screen {
+    layout: vertical;
+    background: #101418;
+    color: #d0d4d8;
+}
+
+#layout-root {
+    layout: grid;
+    grid-rows: 3 12 1fr 1;
+    grid-columns: 1fr;
+    height: 100%;
+    gap: 1;
+    padding: 1;
+}
+
+#row-top,
+#row-middle {
+    gap: 1;
+}
+
+#row-top {
+    layout: horizontal;
+}
+
+#row-middle {
+    layout: horizontal;
+}
+
+#control-panel {
+    width: 40%;
+    border: round $surface-darken-2;
+    padding: 1;
+    background: $panel;
+}
+
+#cycle-info {
+    width: 60%;
+    border: round $surface-darken-2;
+    padding: 1;
+    background: $panel;
+}
+
+#task-queue,
+#gate-panel {
+    width: 30%;
+    border: round $surface-darken-2;
+    padding: 1;
+    background: $panel;
+}
+
+#artifact-browser {
+    width: 40%;
+    border: round $surface-darken-2;
+    padding: 1;
+    background: $panel;
+}
+
+#output-viewer {
+    border: round $surface-darken-2;
+    padding: 1;
+    background: $panel;
+}
+
+#status-bar {
+    border: round $surface-darken-2;
+    padding: 0 1;
+    background: $surface-darken-1;
+    color: $text-muted;
+}
+
+/* Typography */
+Label {
+    text-style: bold;
+}
+
+#status-action {
+    text-style: none;
+    color: $text;
+}
+
+#status-container {
+    layout: horizontal;
+    justify-content: space-between;
+}
+
+/* Navigation buttons */
+Button {
+    height: auto;
+    padding: 0 1;
+    margin: 0 0 1 0;
+    border: solid $surface-darken-1;
+    background: $surface-darken-2;
+    color: $text-muted;
+}
+
+Button:focus {
+    border: double $accent;
+    background: $boost;
+    color: $text;
+    text-style: bold;
+}
+
+#control-buttons {
+    layout: horizontal;
+    gap: 1;
+}
+
+#output-tabs {
+    gap: 1;
+    margin-bottom: 1;
+}
+
+#diff-actions {
+    gap: 1;
+    margin-top: 1;
+}
+
+#findings-panel,
+#logs-panel {
+    height: 12;
+    border: solid $surface-darken-1;
+}
+
+#config-panel,
+#diff-panel,
+#config-lines {
+    height: 12;
+    border: solid $surface-darken-1;
+}
+
+.dim {
+    color: $text-muted;
+}
+
+.artifact-folder {
+    text-style: bold;
+    margin-top: 1;
+}
+
+#artifact-container,
+#gates-container,
+#tasks-container {
+    gap: 0;
+}
+
+#tasks-container Button,
+#gates-container Button,
+#artifact-container Button {
+    width: 100%;
+}
+
+#task-name-input {
+    width: 100%;
+    border: solid $accent;
+}
