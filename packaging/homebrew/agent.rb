@@ -8,14 +8,16 @@ class Agent < Formula
   depends_on "python@3.12"
 
   def install
-    virtualenv_install_with_resources using: "python@3.12" do
-      # Install additional dependencies explicitly
-      system libexec/"bin/pip", "install",
-             "textual>=0.47.0",
-             "watchdog>=3.0.0",
-             "requests>=2.31.0",
-             "keyring>=24.0.0"
-    end
+    virtualenv_install_with_resources using: "python@3.12"
+  end
+
+  def post_install
+    # Install TUI dependencies
+    system libexec/"bin/python", "-m", "pip", "install", "--quiet",
+           "textual>=0.47.0",
+           "watchdog>=3.0.0",
+           "requests>=2.31.0",
+           "keyring>=24.0.0"
   end
 
   service do
