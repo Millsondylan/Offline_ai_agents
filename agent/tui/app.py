@@ -75,20 +75,25 @@ class AgentTUI(App[None]):
 
     async def on_key(self, event: events.Key) -> None:
         """Handle all key presses."""
+        # Debug: show what we have
+        entry_count = len(self.navigation.entries)
+        current = self.navigation.current_index
+        focused = self.navigation.get_focused()
+
         if event.key == "up":
             event.prevent_default()
             event.stop()
-            self.show_status("Up pressed")
+            self.show_status(f"Up ({current}/{entry_count}): {focused.widget_id if focused else 'none'}")
             self.navigation.focus_previous()
         elif event.key == "down":
             event.prevent_default()
             event.stop()
-            self.show_status("Down pressed")
+            self.show_status(f"Down ({current}/{entry_count}): {focused.widget_id if focused else 'none'}")
             self.navigation.focus_next()
         elif event.key == "enter":
             event.prevent_default()
             event.stop()
-            self.show_status("Enter pressed")
+            self.show_status(f"Enter on: {focused.widget_id if focused else 'none'}")
             self.navigation.activate_focused()
         elif event.key == "escape":
             event.prevent_default()
