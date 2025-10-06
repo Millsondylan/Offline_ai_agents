@@ -1,13 +1,23 @@
 {
   "provider": {
-    "type": "command",
-    "model": "llama3",
+    "type": "ollama",
+    "model": "deepseek-coder:6.7b",
     "command": {
-      "args": ["bash", "-lc", "bash agent/local/ollama_provider.sh"],
+      "args": [
+        "bash",
+        "-lc",
+        "bash agent/local/ollama_provider.sh"
+      ],
       "timeout": 1200
-    }
+    },
+    "base_url": "http://localhost:11434"
   },
-  "available_models": ["llama3", "gpt-4", "claude-sonnet-4", "gemini-2.0-flash"],
+  "available_models": [
+    "llama3",
+    "gpt-4",
+    "claude-sonnet-4",
+    "gemini-2.0-flash"
+  ],
   "loop": {
     "max_cycles": 0,
     "cooldown_seconds": 60,
@@ -46,17 +56,38 @@
   "gate": {
     "min_coverage": 0.8,
     "ruff_fix": true,
-    "bandit_fail_levels": ["HIGH", "CRITICAL"],
-    "semgrep_rules": ["p/ci", "p/python"],
+    "bandit_fail_levels": [
+      "HIGH",
+      "CRITICAL"
+    ],
+    "semgrep_rules": [
+      "p/ci",
+      "p/python"
+    ],
     "pip_audit_fix": false,
     "allow_override": false
   },
   "ui_audits": {
     "enabled": false,
-    "targets": ["http://localhost:3000/", "http://localhost:8000/"],
-    "lighthouse": {"enabled": true, "flags": ["--quiet", "--chrome-flags=--headless"]},
-    "axe": {"enabled": true, "flags": []},
-    "pa11y": {"enabled": true, "flags": []}
+    "targets": [
+      "http://localhost:3000/",
+      "http://localhost:8000/"
+    ],
+    "lighthouse": {
+      "enabled": true,
+      "flags": [
+        "--quiet",
+        "--chrome-flags=--headless"
+      ]
+    },
+    "axe": {
+      "enabled": true,
+      "flags": []
+    },
+    "pa11y": {
+      "enabled": true,
+      "flags": []
+    }
   },
   "git": {
     "commit": true,

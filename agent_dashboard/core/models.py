@@ -43,10 +43,10 @@ class AgentState:
     """Complete agent state."""
     status: AgentStatus = AgentStatus.IDLE
     mode: AgentMode = AgentMode.AUTO
-    model: str = "GPT-4"
+    model: str = "Detecting..."
     session_id: str = "0"
     cycle: int = 0
-    max_cycles: int = 100
+    max_cycles: int = 0  # 0 = infinite (never stops)
     elapsed_seconds: int = 0
     progress_percent: int = 0
     current_task: Optional[str] = None

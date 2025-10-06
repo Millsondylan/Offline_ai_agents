@@ -40,6 +40,12 @@ class RealAgentManager:
         self.control_dir.mkdir(parents=True, exist_ok=True)
         self.state_root.mkdir(parents=True, exist_ok=True)
 
+        # Load model from config
+        self._load_model_from_config()
+
+        # Set real session ID
+        self.state.session_id = str(int(time.time()))
+
         # Initial log
         self._add_log(LogLevel.INFO, "Dashboard initialized - autonomous agent ready")
 
@@ -208,6 +214,20 @@ class RealAgentManager:
             except Exception as e:
                 with self._lock:
                     self._add_log(LogLevel.ERROR, f"Monitor error: {e}")
+
+    def _load_model_from_config(self):
+        """Load model name from config file."""
+        try:
+            config_path = self.repo_root / "agent" / "config.json"
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                    model = config.get('provider', {}).get('model', 'Not configured')
+                    self.state.model = model
+            else:
+                self.state.model = "No config found"
+        except Exception:
+            self.state.model = "Config error"
 
     def _add_log(self, level: LogLevel, message: str):
         """Add a log entry (must be called with lock held)."""
