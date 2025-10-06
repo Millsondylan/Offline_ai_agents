@@ -63,8 +63,8 @@ class Dashboard:
         self.stdscr.timeout(100)
         self.theme_manager.initialize()
 
-        # Start the agent
-        self.agent_manager.start()
+        # Don't auto-start - let user press S to start
+        # This prevents errors during dashboard initialization
 
     def run(self):
         """Main event loop."""
