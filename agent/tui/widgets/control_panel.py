@@ -87,6 +87,38 @@ class ViewLogsButton(NavigationItem):
         getattr(self.app, "open_logs", lambda: None)()
 
 
+class TaskManagerButton(NavigationItem):
+    def __init__(self) -> None:
+        super().__init__("Task Manager - Create and track execution tasks", "Open task manager", id="control-tasks")
+
+    def handle_enter(self) -> None:  # type: ignore[override]
+        getattr(self.app, "open_task_manager", lambda: None)()
+
+
+class ThinkingViewButton(NavigationItem):
+    def __init__(self) -> None:
+        super().__init__("Model Thinking - View AI reasoning process", "View model thinking", id="control-thinking")
+
+    def handle_enter(self) -> None:  # type: ignore[override]
+        getattr(self.app, "open_thinking_log", lambda: None)()
+
+
+class ModelConfigButton(NavigationItem):
+    def __init__(self) -> None:
+        super().__init__("Model Config - Select model and manage API keys", "Configure models", id="control-model-config")
+
+    def handle_enter(self) -> None:  # type: ignore[override]
+        getattr(self.app, "open_model_config", lambda: None)()
+
+
+class VerificationButton(NavigationItem):
+    def __init__(self) -> None:
+        super().__init__("Verification - Configure quality checks", "Configure verification", id="control-verification")
+
+    def handle_enter(self) -> None:  # type: ignore[override]
+        getattr(self.app, "open_verification_config", lambda: None)()
+
+
 class ControlPanel(Static):
     def __init__(self) -> None:
         super().__init__(id="control-panel")
@@ -100,6 +132,10 @@ class ControlPanel(Static):
         self.model_button = ModelSwitcherButton()
         self.commit_button = ForceCommitButton()
         self.logs_button = ViewLogsButton()
+        self.task_manager_button = TaskManagerButton()
+        self.thinking_button = ThinkingViewButton()
+        self.model_config_button = ModelConfigButton()
+        self.verification_button = VerificationButton()
 
     def compose(self):
         yield Vertical(
@@ -107,9 +143,16 @@ class ControlPanel(Static):
             self.status_label,
             self.provider_label,
             self.session_label,
+            Label("\n─── Agent Control ───", classes="separator"),
             self.start_button,
             self.pause_button,
             self.stop_button,
+            Label("\n─── Advanced Features ───", classes="separator"),
+            self.task_manager_button,
+            self.thinking_button,
+            self.model_config_button,
+            self.verification_button,
+            Label("\n─── Actions ───", classes="separator"),
             self.model_button,
             self.commit_button,
             self.logs_button,

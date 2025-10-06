@@ -21,6 +21,10 @@ from .widgets.detail_view import DetailView
 from .widgets.output_viewer import OutputViewer
 from .widgets.status_bar import StatusBar
 from .widgets.task_queue import TaskQueue
+from .widgets.thinking_log import ThinkingLog
+from .widgets.model_selector import ModelSelector
+from .widgets.verification_config import VerificationConfig
+from .widgets.task_manager import TaskManager
 
 
 class AgentTUI(App[None]):
@@ -61,10 +65,20 @@ class AgentTUI(App[None]):
         self.output_viewer = OutputViewer()
         self.detail_view = DetailView()
         self.status_bar = StatusBar()
+        self.thinking_log = ThinkingLog()
+        self.model_selector = ModelSelector()
+        self.verification_config = VerificationConfig()
+        self.task_manager = TaskManager()
         self._status_timer = None
         self._in_detail_mode = False
         self.control_root = Path(__file__).resolve().parent.parent / "local" / "control"
         self.config_path = Path(__file__).resolve().parent.parent / "config.json"
+
+        # Initialize task executor
+        from ..task_executor import TaskExecutor
+        state_root = Path(__file__).resolve().parent.parent / "state" / "tasks"
+        state_root.mkdir(parents=True, exist_ok=True)
+        self.task_executor = TaskExecutor(state_root)
 
     # ------------------------------------------------------------------
     # Layout
@@ -199,6 +213,10 @@ class AgentTUI(App[None]):
             self.control_panel.start_button,
             self.control_panel.pause_button,
             self.control_panel.stop_button,
+            self.control_panel.task_manager_button,
+            self.control_panel.thinking_button,
+            self.control_panel.model_config_button,
+            self.control_panel.verification_button,
             self.control_panel.model_button,
             self.control_panel.commit_button,
             self.control_panel.logs_button,
@@ -427,6 +445,152 @@ class AgentTUI(App[None]):
             "  h/?     This help"
         )
         self.show_status(help_text, duration=10.0)
+
+    # ------------------------------------------------------------------
+    # New Feature Methods
+    # ------------------------------------------------------------------
+
+    def open_task_manager(self) -> None:
+        """Open the task management interface."""
+        self.show_detail("Task Manager")
+        self.detail_view.add_log("[bold cyan]Task Execution Manager[/bold cyan]")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("Create and manage execution tasks with comprehensive verification:")
+        self.detail_view.add_log("• Define tasks with custom time limits and verification counts")
+        self.detail_view.add_log("• Track execution progress in real-time")
+        self.detail_view.add_log("• View detailed verification results")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("[dim]Use the task manager to create new execution tasks from the menu.[/dim]")
+
+    def open_thinking_log(self) -> None:
+        """Open the model thinking log viewer."""
+        self.show_detail("Model Thinking Log")
+        self.detail_view.add_log("[bold cyan]AI Model Reasoning Process[/bold cyan]")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("This view shows the model's thinking process including:")
+        self.detail_view.add_log("• Planning and strategy decisions")
+        self.detail_view.add_log("• Code analysis and reasoning")
+        self.detail_view.add_log("• Verification check results")
+        self.detail_view.add_log("• Model responses and interactions")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("[dim]The thinking log updates in real-time during task execution.[/dim]")
+
+    def open_model_config(self) -> None:
+        """Open model configuration interface."""
+        self.show_detail("Model Configuration")
+        self.detail_view.add_log("[bold cyan]AI Model Configuration[/bold cyan]")
+        self.detail_view.add_log("")
+
+        # Show available models from config
+        try:
+            with open(self.config_path, "r") as f:
+                config = json.load(f)
+                available_models = config.get("available_models", [])
+                current_model = config.get("provider", {}).get("model", "unknown")
+
+                self.detail_view.add_log(f"[bold]Current Model:[/bold] {current_model}")
+                self.detail_view.add_log("")
+                self.detail_view.add_log("[bold]Available Models:[/bold]")
+                for model in available_models:
+                    marker = "→" if model == current_model else " "
+                    self.detail_view.add_log(f"  {marker} {model}")
+        except Exception as e:
+            self.detail_view.add_log(f"[red]Error loading configuration: {e}[/red]")
+
+        self.detail_view.add_log("")
+        self.detail_view.add_log("[bold]Features:[/bold]")
+        self.detail_view.add_log("• Switch between offline and API models")
+        self.detail_view.add_log("• Configure API keys securely")
+        self.detail_view.add_log("• Download new models (Ollama)")
+
+    def open_verification_config(self) -> None:
+        """Open verification configuration interface."""
+        self.show_detail("Verification Configuration")
+        self.detail_view.add_log("[bold cyan]Verification Checks Configuration[/bold cyan]")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("Configure comprehensive quality checks:")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("[bold red]CRITICAL CHECKS[/bold red] (Must Pass):")
+        self.detail_view.add_log("  ✓ Syntax Validation")
+        self.detail_view.add_log("  ✓ Import Validation")
+        self.detail_view.add_log("  ✓ Test Suite Execution")
+        self.detail_view.add_log("  ✓ Security Scanning")
+        self.detail_view.add_log("  ✓ Build Verification")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("[bold yellow]HIGH PRIORITY CHECKS[/bold yellow]:")
+        self.detail_view.add_log("  • Linter Checks (Ruff)")
+        self.detail_view.add_log("  • Type Checking")
+        self.detail_view.add_log("  • Code Coverage")
+        self.detail_view.add_log("  • Dependency Audit")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("[bold blue]MEDIUM/LOW PRIORITY[/bold blue]:")
+        self.detail_view.add_log("  • Code Formatting")
+        self.detail_view.add_log("  • Documentation (Docstrings)")
+        self.detail_view.add_log("  • Performance Baseline")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("[dim]Customize time limits and verification counts as needed.[/dim]")
+
+    def create_execution_task(self, task_name: str, description: str, max_duration: int, max_verifications: int) -> str:
+        """Create a new execution task."""
+        task_id = self.task_executor.create_task(
+            task_name=task_name,
+            description=description,
+            max_duration=max_duration,
+            max_verifications=max_verifications,
+        )
+        self.show_status(f"Task '{task_name}' created with ID {task_id}")
+        return task_id
+
+    def view_task_execution(self, task_id: str) -> None:
+        """View details of a task execution."""
+        task = self.task_executor.get_task(task_id)
+        if not task:
+            self.show_status(f"Task {task_id} not found", duration=3.0)
+            return
+
+        self.show_detail(f"Task: {task.task_name}")
+        self.detail_view.add_log(f"[bold cyan]Task ID:[/bold cyan] {task_id}")
+        self.detail_view.add_log(f"[bold cyan]Name:[/bold cyan] {task.task_name}")
+        self.detail_view.add_log(f"[bold cyan]Description:[/bold cyan] {task.description}")
+        self.detail_view.add_log(f"[bold cyan]Status:[/bold cyan] {task.status.value}")
+        self.detail_view.add_log(f"[bold cyan]Progress:[/bold cyan] {task.progress:.1f}%")
+        self.detail_view.add_log("")
+        self.detail_view.add_log(f"[bold]Verifications:[/bold] {task.verification_passed}/{task.verification_total} passed")
+        if task.verification_failed > 0:
+            self.detail_view.add_log(f"[red]Failed: {task.verification_failed}[/red]")
+
+        if task.verification_results:
+            self.detail_view.add_log("")
+            self.detail_view.add_log("[bold]Verification Details:[/bold]")
+            for result in task.verification_results[-10:]:  # Show last 10
+                icon = "✅" if result.passed else "❌"
+                self.detail_view.add_log(f"  {icon} {result.check_id}: {result.message}")
+
+    def cancel_execution_task(self, task_id: str) -> bool:
+        """Cancel a running task."""
+        return self.task_executor.cancel_task(task_id)
+
+    def configure_verification(self, max_verifications: int, max_duration: int, enabled_checks: List[str]) -> None:
+        """Configure verification settings."""
+        self.task_executor.configure_checks(
+            max_verifications=max_verifications,
+            max_duration=max_duration,
+            enabled_checks=enabled_checks,
+        )
+        self.show_status(f"Verification configured: {len(enabled_checks)} checks enabled")
+
+    def download_model(self, model_name: str) -> None:
+        """Download a model (for offline providers like Ollama)."""
+        self.show_detail(f"Downloading Model: {model_name}")
+        self.detail_view.add_log(f"Starting download of model: [bold cyan]{model_name}[/bold cyan]")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("[yellow]This may take several minutes depending on model size...[/yellow]")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("[dim]The download will continue in the background.[/dim]")
+        self.detail_view.add_log("[dim]Check your terminal for download progress.[/dim]")
+
+        # Trigger download via control file
+        self._write_control("download_model", model_name)
 
 
 def launch_app() -> int:

@@ -74,5 +74,24 @@
     "refresh_hz": 15,
     "show_thinking": true,
     "theme": "auto"
+  },
+  "task_execution": {
+    "default_max_verifications": 100,
+    "default_max_duration": 3600,
+    "enabled_checks": [
+      "syntax_valid",
+      "imports_valid",
+      "tests_pass",
+      "linter_pass",
+      "formatter_check",
+      "security_scan",
+      "dependency_audit",
+      "build_success",
+      "no_conflicts",
+      "type_check",
+      "coverage_threshold"
+    ],
+    "require_all_critical": true,
+    "abort_on_critical_failure": true
   }
 }

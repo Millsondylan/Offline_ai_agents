@@ -104,7 +104,8 @@ class Analyzer:
         return files or []
 
     def execute(self, repo_root: str, cycle_dir: str, targets: List[str]) -> CommandResult:
-        raise NotImplementedError
+        """Execute the analyzer command. Subclasses must implement this method."""
+        raise NotImplementedError(f"{self.__class__.__name__}.execute() must be implemented by subclass")
 
     def parse(
         self,
