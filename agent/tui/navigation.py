@@ -84,11 +84,16 @@ class NavigationManager:
         if not entry:
             return
 
-        widget = self.app.query_one(f"#{entry.widget_id}")
-        if hasattr(widget, "handle_enter"):
-            widget.handle_enter()
-        elif hasattr(widget, "press"):
-            widget.press()
+        try:
+            widget = self.app.query_one(f"#{entry.widget_id}")
+            if hasattr(widget, "handle_enter"):
+                widget.handle_enter()
+            elif hasattr(widget, "press"):
+                widget.press()
+        except Exception as e:
+            # If widget lookup fails, log it
+            if hasattr(self.app, "show_status"):
+                self.app.show_status(f"Navigation error: {e}")
 
     def _apply_focus(self) -> None:
         """Apply focus styling to current element."""

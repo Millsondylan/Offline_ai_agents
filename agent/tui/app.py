@@ -24,6 +24,13 @@ class AgentTUI(App[None]):
 
     CSS_PATH = Path(__file__).with_name("styles.css")
 
+    BINDINGS = [
+        ("up", "focus_previous", "Previous"),
+        ("down", "focus_next", "Next"),
+        ("enter", "activate", "Activate"),
+        ("escape", "quit_app", "Exit"),
+    ]
+
     def __init__(self) -> None:
         super().__init__()
         self.state_watcher = StateWatcher()
@@ -61,20 +68,22 @@ class AgentTUI(App[None]):
     # Input & navigation handling
     # ------------------------------------------------------------------
 
-    async def on_key(self, event: events.Key) -> None:  # type: ignore[override]
-        if event.key == "down":
-            event.stop()
-            self.navigation.focus_next()
-        elif event.key == "up":
-            event.stop()
-            self.navigation.focus_previous()
-        elif event.key == "enter":
-            event.stop()
-            self.navigation.activate_focused()
-        elif event.key == "escape":
-            event.stop()
-            self.stop_agent()
-            self.exit()
+    def action_focus_next(self) -> None:
+        """Move to next focusable element."""
+        self.navigation.focus_next()
+
+    def action_focus_previous(self) -> None:
+        """Move to previous focusable element."""
+        self.navigation.focus_previous()
+
+    def action_activate(self) -> None:
+        """Activate currently focused element."""
+        self.navigation.activate_focused()
+
+    def action_quit_app(self) -> None:
+        """Stop agent and exit."""
+        self.stop_agent()
+        self.exit()
 
     async def on_navigation_hint(self, message: NavigationHint) -> None:
         self.status_bar.update_action(message.action)
