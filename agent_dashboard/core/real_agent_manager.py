@@ -178,19 +178,25 @@ class RealAgentManager:
         """Run the real agent loop using TaskExecutor."""
         try:
             with self._lock:
-                self._add_log(LogLevel.INFO, "Starting TaskExecutor from agent/task_executor.py")
+                self._add_log(LogLevel.INFO, "Starting TaskExecutor")
 
-            # The TaskExecutor will run in its own thread and manage its own state.
-            # We just need to start it.
-            # We will need a way to get the state from it.
-            # For now, we will just run it.
-            # This is not ideal, but it's a step in the right direction.
+            # Run the task executor's continuous loop
+            # This will block, but it's in a daemon thread so it's OK
             self.task_executor.run_continuously()
 
         except Exception as e:
+            import traceback
+            error_msg = f"Agent error: {str(e)}\n{traceback.format_exc()}"
             with self._lock:
-                self._add_log(LogLevel.ERROR, f"Agent error: {str(e)}")
-                self.state.status = AgentStatus.STOPPED
+                self._add_log(LogLevel.ERROR, error_msg)
+                self.state.status = AgentStatus.ERROR
+
+            # Write to file for debugging
+            try:
+                with open(self.state_root / "agent_error.log", "w") as f:
+                    f.write(error_msg)
+            except:
+                pass
 
     def _load_model_from_config(self):
         """Load model name from config file."""
