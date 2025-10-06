@@ -12,10 +12,10 @@ class SimpleTUI(App):
     """Simple TUI with clear instructions."""
 
     BINDINGS = [
-        Binding("q", "quit", "Quit"),
-        Binding("r", "run", "Run Cycle"),
-        Binding("s", "status", "Show Status"),
-        Binding("h", "help", "Help"),
+        Binding("q", "quit", "Quit", show=True),
+        Binding("r", "run", "Run Cycle", show=True),
+        Binding("s", "status", "Show Status", show=True),
+        Binding("h", "help", "Help", show=True),
     ]
 
     CSS = """
@@ -64,6 +64,7 @@ class SimpleTUI(App):
     def __init__(self):
         super().__init__()
         self.control_root = Path(__file__).resolve().parent.parent / "local" / "control"
+        self.state_root = Path(__file__).resolve().parent.parent / "state"
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -106,29 +107,37 @@ The agent watches your code, suggests improvements, and runs safety checks.
 
     def action_run(self) -> None:
         """Run a cycle."""
-        self.control_root.mkdir(parents=True, exist_ok=True)
-        (self.control_root / "run_cycle.cmd").write_text("now")
-        status = self.query_one("#status-panel", Static)
-        status.update("[green]✓[/green] Cycle started! Check agent/artifacts/ for results.")
+        try:
+            self.control_root.mkdir(parents=True, exist_ok=True)
+            (self.control_root / "run_cycle.cmd").write_text("now")
+            status = self.query_one("#status-panel", Static)
+            status.update("[green]✓[/green] Cycle started! Check agent/artifacts/ for results.")
+        except Exception as e:
+            status = self.query_one("#status-panel", Static)
+            status.update(f"[red]Error:[/red] {e}")
 
     def action_status(self) -> None:
         """Show status."""
-        status = self.query_one("#status-panel", Static)
-        state_root = Path(__file__).resolve().parent.parent / "state"
-        if (state_root / "session.json").exists():
-            import json
-            session = json.loads((state_root / "session.json").read_text())
-            status.update(f"[cyan]Status:[/cyan] {session.get('status', 'unknown')}\n"
-                         f"[cyan]Cycle:[/cyan] {session.get('current_cycle', 0)}\n"
-                         f"[cyan]Phase:[/cyan] {session.get('phase', 'idle')}")
-        else:
-            status.update("[yellow]No active session found. Press 'r' to start.[/yellow]")
+        try:
+            status = self.query_one("#status-panel", Static)
+            if (self.state_root / "session.json").exists():
+                import json
+                session = json.loads((self.state_root / "session.json").read_text())
+                status.update(f"[cyan]Status:[/cyan] {session.get('status', 'unknown')}\n"
+                             f"[cyan]Cycle:[/cyan] {session.get('current_cycle', 0)}\n"
+                             f"[cyan]Phase:[/cyan] {session.get('phase', 'idle')}")
+            else:
+                status.update("[yellow]No active session found. Press 'r' to start.[/yellow]")
+        except Exception as e:
+            status = self.query_one("#status-panel", Static)
+            status.update(f"[red]Error:[/red] {e}")
 
     def action_help(self) -> None:
         """Show help."""
-        status = self.query_one("#status-panel", Static)
-        status.update(
-            """[bold cyan]Command Reference:[/bold cyan]
+        try:
+            status = self.query_one("#status-panel", Static)
+            status.update(
+                """[bold cyan]Command Reference:[/bold cyan]
 
 [cyan]r[/cyan] - Run Cycle: Starts a new agent cycle
 [cyan]s[/cyan] - Status: Shows current agent state
@@ -141,7 +150,10 @@ The agent watches your code, suggests improvements, and runs safety checks.
 - State files: agent/state/
 - Artifacts: agent/artifacts/
             """
-        )
+            )
+        except Exception as e:
+            status = self.query_one("#status-panel", Static)
+            status.update(f"[red]Error:[/red] {e}")
 
 
 def launch_simple_tui() -> int:
