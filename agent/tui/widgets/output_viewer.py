@@ -125,17 +125,24 @@ class OutputViewer(Static):
         return self._active_tab
 
     def compose(self):
-        for button in self.tab_buttons.values():
-            self.tabs_row.mount(button)
         self.findings_panel.styles.auto_scroll = True
         self.logs_panel.styles.auto_scroll = True
-        yield self.tabs_row
+
+        # Yield tabs row with buttons as children
+        with Horizontal(id="output-tabs") as tabs_row:
+            self.tabs_row = tabs_row
+            for button in self.tab_buttons.values():
+                yield button
+
         yield self.diff_panel
         yield self.findings_panel
         yield self.logs_panel
         yield self.config_panel
         yield self.config_lines_container
         yield Horizontal(self.apply_button, self.reject_button, id="diff-actions")
+
+    def on_mount(self) -> None:
+        """Called when the widget is mounted."""
         self.select_tab(self._active_tab)
 
     # ------------------------------------------------------------------
