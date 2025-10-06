@@ -1,0 +1,14 @@
+{
+  "status": "running",
+  "cycle_count": 42,
+  "current_cycle": 42,
+  "phase": "executing",
+  "elapsed_seconds": 125,
+  "estimated_seconds": 300,
+  "session_duration": 7200,
+  "fastpath_files": [
+    "src/main.py",
+    "src/utils.py",
+    "tests/test_main.py"
+  ]
+}

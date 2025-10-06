@@ -7,6 +7,7 @@
       "timeout": 1200
     }
   },
+  "available_models": ["llama3", "gpt-4", "claude-sonnet-4", "gemini-2.0-flash"],
   "loop": {
     "max_cycles": 0,
     "cooldown_seconds": 60,

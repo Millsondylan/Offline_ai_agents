@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List
 
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.widgets import Label, Static, Input
 
 from ..navigation import NavEntry, NavigationItem
@@ -71,6 +71,7 @@ class TaskQueue(Static):
     def __init__(self) -> None:
         super().__init__(id="task-queue")
         self.title = Label("Task Queue", id="tasks-title")
+        self.tasks_scroll = VerticalScroll(id="tasks-scroll")
         self.tasks_container = Vertical(id="tasks-container")
         self.new_task_button = NewTaskButton(self)
         self.new_task_input: TaskNameInput | None = None
@@ -78,12 +79,14 @@ class TaskQueue(Static):
         self._empty_label: Label | None = None
 
     def compose(self):
-        yield Vertical(
-            self.title,
-            self.tasks_container,
-            self.new_task_button,
-            id="task-panel",
-        )
+        # Prevent scroll container from stealing focus
+        self.tasks_scroll.can_focus = False
+
+        with Vertical(id="task-panel"):
+            yield self.title
+            with self.tasks_scroll:
+                yield self.tasks_container
+            yield self.new_task_button
 
     def update_tasks(self, tasks: List[TaskState]) -> None:
         existing = list(self.tasks_container.children)

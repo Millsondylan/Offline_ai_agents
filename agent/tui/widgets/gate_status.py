@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List
 
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.widgets import Label, Static
 
 from ..navigation import NavEntry, NavigationItem
@@ -33,16 +33,18 @@ class GateStatusPanel(Static):
     def __init__(self) -> None:
         super().__init__(id="gate-panel")
         self.title = Label("Gates & Safety", id="gate-title")
+        self.gates_scroll = VerticalScroll(id="gates-scroll")
         self.gates_container = Vertical(id="gates-container")
         self._nav_entries: List[NavEntry] = []
         self._empty_label: Label | None = None
 
     def compose(self):
-        yield Vertical(
-            self.title,
-            self.gates_container,
-            id="gate-body",
-        )
+        self.gates_scroll.can_focus = False
+
+        with Vertical(id="gate-body"):
+            yield self.title
+            with self.gates_scroll:
+                yield self.gates_container
 
     def update_gates(self, gates: List[GateState]) -> None:
         existing = list(self.gates_container.children)

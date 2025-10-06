@@ -52,10 +52,27 @@ class NavigationManager:
         self.on_focus_change = on_focus_change
 
     def set_entries(self, entries: List[NavEntry]) -> None:
-        """Update the navigation chain."""
+        """Update the navigation chain, preserving focus if possible."""
+        # Remember currently focused widget ID
+        current_widget_id = None
+        if self.entries and 0 <= self.current_index < len(self.entries):
+            current_widget_id = self.entries[self.current_index].widget_id
+
+        # Update entries
         self.entries = entries
+
+        # Try to restore focus to same widget ID
+        if current_widget_id:
+            for i, entry in enumerate(entries):
+                if entry.widget_id == current_widget_id:
+                    self.current_index = i
+                    self._apply_focus()
+                    return
+
+        # Widget not found, reset to 0 or clamp to valid range
         if self.current_index >= len(entries):
-            self.current_index = 0
+            self.current_index = max(0, len(entries) - 1)
+
         self._apply_focus()
 
     def focus_next(self) -> None:
@@ -111,6 +128,10 @@ class NavigationManager:
             try:
                 widget = self.app.query_one(f"#{entry.widget_id}")
                 widget.add_class("focused")
+
+                # Scroll to keep focused widget visible
+                widget.scroll_visible(animate=False)
+
                 if self.on_focus_change:
                     self.on_focus_change(entry)
             except Exception:

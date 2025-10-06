@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List
 
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.widgets import Label, Static
 
 from ..navigation import NavEntry, NavigationItem
@@ -22,16 +22,18 @@ class ArtifactBrowser(Static):
     def __init__(self) -> None:
         super().__init__(id="artifact-browser")
         self.title = Label("Artifacts", id="artifact-title")
+        self.artifact_scroll = VerticalScroll(id="artifact-scroll")
         self.container = Vertical(id="artifact-container")
         self._nav_entries: List[NavEntry] = []
         self._empty_label: Label | None = None
 
     def compose(self):
-        yield Vertical(
-            self.title,
-            self.container,
-            id="artifact-panel",
-        )
+        self.artifact_scroll.can_focus = False
+
+        with Vertical(id="artifact-panel"):
+            yield self.title
+            with self.artifact_scroll:
+                yield self.container
 
     def update_artifacts(self, artifacts: List[ArtifactState]) -> None:
         existing = list(self.container.children)

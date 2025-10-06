@@ -258,12 +258,26 @@ NavigationItem.focused {
 }
 
 /* Scrollbars - using Textual scrollbar styling */
+VerticalScroll {
+    height: 1fr;
+    scrollbar-size: 1 1;
+}
+
 Vertical > ScrollableContainer {
     scrollbar-size: 1 1;
 }
 
 Horizontal > ScrollableContainer {
     scrollbar-size: 1 1;
+}
+
+#tasks-scroll, #gates-scroll, #artifact-scroll {
+    height: 1fr;
+}
+
+#config-lines {
+    height: 1fr;
+    overflow-y: auto;
 }
 
 /* Log viewer */

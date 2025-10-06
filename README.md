@@ -67,10 +67,58 @@ Now `agent` will resolve to the repository launcher instead of any system/brew i
 
 Activate your virtualenv first: `source .venv/bin/activate`.
 
-### Launch the Textual TUI
+### Launch the TUI (Terminal User Interface)
 ```bash
 agent
 ```
+
+The TUI provides a complete real-time dashboard for monitoring and controlling the agent:
+
+#### Navigation
+- **↑/↓ Arrow Keys**: Navigate between all interactive elements (wraps around)
+- **ENTER**: Execute focused action instantly (no confirmation dialogs)
+- **ESC**: Exit TUI
+
+#### TUI Features
+
+**Control Panel**
+- Live status indicator: ● RUNNING, ⏸ PAUSED, ⏹ STOPPED
+- Pause/Resume agent execution
+- Stop agent gracefully
+- Force immediate commit
+- Switch between available models (cycles through list)
+- Session duration and cycle counter
+
+**Task Queue**
+- View all queued tasks with real-time status updates
+- Add new tasks via inline input ([+ New Task] button)
+- Status indicators: ▶ running, □ pending, ✓ complete, ✗ failed
+- Automatically scrolls to keep focused task visible
+
+**Gate Status & Safety**
+- Real-time monitoring of all production gates
+- Status indicators: ✓ passed, ✗ failed, ⟳ running, ⏳ pending
+- View detailed findings for any gate (press ENTER)
+- Monitors: Ruff, Bandit, Pytest, Mypy, Semgrep, and custom gates
+
+**Artifact Browser**
+- Navigate all generated files by cycle
+- Hierarchical file tree (cycle_NNN/file.ext)
+- Quick access to diffs, findings, logs, and config
+- Press ENTER to open artifact in viewer
+
+**Output Viewer** (Tabbed)
+- **Diff Tab**: Syntax-highlighted diffs with apply/reject actions
+- **Findings Tab**: Filtered findings by gate with severity levels
+- **Logs Tab**: Auto-scrolling logs (last 100 lines)
+- **Config Tab**: Interactive JSON editor (press ENTER to edit values inline)
+
+#### Requirements
+- Python 3.11+
+- Textual framework (installed automatically via `pip install textual`)
+- Terminal with minimum 80x24 size
+- UTF-8 encoding for proper icons
+
 If Textual is missing you will be prompted—install it with `pip install textual`.
 
 ### Run a bounded headless cycle
