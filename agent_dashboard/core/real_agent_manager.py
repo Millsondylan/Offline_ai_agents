@@ -1,31 +1,18 @@
 """Real agent manager that integrates with agent/run.py."""
 
-print("Importing threading")
 import threading
-print("Importing time")
 import time
-print("Importing datetime")
 from datetime import datetime
-print("Importing deque")
 from collections import deque
-print("Importing Path")
 from pathlib import Path
-print("Importing typing")
 from typing import Optional, List
-print("Importing json")
 import json
-import sys
 
-print("Importing TaskExecutor")
 from agent.task_executor import TaskExecutor
-print("Imported TaskExecutor")
-
-print("Importing models")
 from agent_dashboard.core.models import (
     AgentState, AgentStatus, AgentMode, Task, TaskStatus,
     ThoughtEntry, LogEntry, LogLevel
 )
-print("Imported models")
 
 
 class RealAgentManager:
@@ -77,11 +64,11 @@ class RealAgentManager:
             self._stop_flag = False
 
         # Start agent thread
-        # self._agent_thread = threading.Thread(target=self._run_real_agent, daemon=True)
-        # self._agent_thread.start()
-        self._run_real_agent()
+        self._agent_thread = threading.Thread(target=self._run_real_agent, daemon=True)
+        self._agent_thread.start()
 
-        self._add_log(LogLevel.INFO, "Real agent started - autonomous mode")
+        with self._lock:
+            self._add_log(LogLevel.INFO, "Real agent started - autonomous mode")
 
     def pause(self):
         """Pause the agent (not supported for autonomous agent)."""
