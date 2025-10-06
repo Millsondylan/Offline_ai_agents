@@ -1,5 +1,5 @@
 """TUI module for agent."""
 
-from .app import AgentTUI, launch_app
+from .simple_app import SimpleTUI, launch_simple_tui
 
-__all__ = ["AgentTUI", "launch_app"]
+__all__ = ["SimpleTUI", "launch_simple_tui"]

@@ -1,10 +1,10 @@
 def launch_tui() -> int:
     try:
-        from .tui.app import launch_app
+        from .tui.simple_app import launch_simple_tui
     except RuntimeError as exc:
         print(f"TUI unavailable: {exc}")
         return 1
-    return launch_app()
+    return launch_simple_tui()
 
 
 if __name__ == "__main__":
