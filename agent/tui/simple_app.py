@@ -12,10 +12,10 @@ class SimpleTUI(App):
     """Simple TUI with clear instructions."""
 
     BINDINGS = [
-        Binding("q", "quit", "Quit", show=True),
-        Binding("r", "run", "Run Cycle", show=True),
-        Binding("s", "status", "Show Status", show=True),
-        Binding("h", "help", "Help", show=True),
+        Binding("q", "quit", "Quit", show=True, priority=True),
+        Binding("r", "run", "Run Cycle", show=True, priority=True),
+        Binding("s", "status", "Show Status", show=True, priority=True),
+        Binding("h", "help", "Help", show=True, priority=True),
     ]
 
     CSS = """
@@ -99,11 +99,16 @@ The agent watches your code, suggests improvements, and runs safety checks.
                     id="instructions",
                     classes="help-text"
                 ),
-                Static("[dim]Status: Waiting for commands...[/dim]", id="status-panel"),
+                Static("[dim]Status: Waiting for commands... (Press a key to test)[/dim]", id="status-panel"),
                 id="main-container"
             )
         )
         yield Footer()
+
+    def on_key(self, event) -> None:
+        """Debug: Show which key was pressed."""
+        status = self.query_one("#status-panel", Static)
+        status.update(f"[yellow]Key pressed: {event.key}[/yellow]")
 
     def action_run(self) -> None:
         """Run a cycle."""
