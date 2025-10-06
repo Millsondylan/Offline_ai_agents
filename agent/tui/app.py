@@ -25,6 +25,7 @@ from .widgets.thinking_log import ThinkingLog
 from .widgets.model_selector import ModelSelector
 from .widgets.verification_config import VerificationConfig
 from .widgets.task_manager import TaskManager
+from .widgets.code_viewer import CodeViewer, FileSelector
 
 
 class AgentTUI(App[None]):
@@ -36,21 +37,9 @@ class AgentTUI(App[None]):
     can_focus = True
 
     BINDINGS = [
-        Binding("up,k", "focus_previous", "Previous", priority=True),
-        Binding("down,j", "focus_next", "Next", priority=True),
-        Binding("enter,space", "activate", "Activate", priority=True),
-        Binding("escape,q", "quit_app", "Exit", priority=True),
-        Binding("1", "jump_to", "Jump to 1", priority=True),
-        Binding("2", "jump_to", "Jump to 2", priority=True),
-        Binding("3", "jump_to", "Jump to 3", priority=True),
-        Binding("4", "jump_to", "Jump to 4", priority=True),
-        Binding("5", "jump_to", "Jump to 5", priority=True),
-        Binding("6", "jump_to", "Jump to 6", priority=True),
-        Binding("7", "jump_to", "Jump to 7", priority=True),
-        Binding("8", "jump_to", "Jump to 8", priority=True),
-        Binding("9", "jump_to", "Jump to 9", priority=True),
-        Binding("0", "jump_to", "Jump to 10", priority=True),
-        Binding("h,question_mark", "show_help", "Help", priority=True),
+        # Note: Key handling is done in on_key() method for better control
+        # Bindings here are just for documentation
+        Binding("h,question_mark", "show_help", "Help", show=True),
     ]
 
     def __init__(self) -> None:
@@ -69,8 +58,11 @@ class AgentTUI(App[None]):
         self.model_selector = ModelSelector()
         self.verification_config = VerificationConfig()
         self.task_manager = TaskManager()
+        self.code_viewer = CodeViewer()
+        self.file_selector = FileSelector()
         self._status_timer = None
         self._in_detail_mode = False
+        self._in_code_view = False
         self.control_root = Path(__file__).resolve().parent.parent / "local" / "control"
         self.config_path = Path(__file__).resolve().parent.parent / "config.json"
 
@@ -98,12 +90,16 @@ class AgentTUI(App[None]):
             id="menu-container"
         )
 
-        # Detail view starts hidden
+        # Detail view and code viewer start hidden
         self.detail_view.display = False
+        self.code_viewer.display = False
+        self.file_selector.display = False
 
         yield Vertical(
             self.menu_container,
             self.detail_view,
+            self.code_viewer,
+            self.file_selector,
             self.status_bar,
             id="layout-root",
         )
@@ -141,6 +137,14 @@ class AgentTUI(App[None]):
 
     async def on_key(self, event: events.Key) -> None:
         """Handle all key presses."""
+        # In code view mode, only ESC works to go back
+        if self._in_code_view:
+            if event.key == "escape":
+                event.prevent_default()
+                event.stop()
+                self.show_menu()
+            return
+
         # In detail mode, only ESC/q work to go back
         if self._in_detail_mode:
             if event.key in ("escape", "q"):
@@ -180,26 +184,7 @@ class AgentTUI(App[None]):
             event.stop()
             self.show_help()
 
-    def action_focus_next(self) -> None:
-        """Move to next focusable element."""
-        self.show_status("Down pressed")
-        self.navigation.focus_next()
-
-    def action_focus_previous(self) -> None:
-        """Move to previous focusable element."""
-        self.show_status("Up pressed")
-        self.navigation.focus_previous()
-
-    def action_activate(self) -> None:
-        """Activate currently focused element."""
-        self.show_status("Enter pressed")
-        self.navigation.activate_focused()
-
-    def action_quit_app(self) -> None:
-        """Stop agent and exit."""
-        self.show_status("Escape pressed")
-        self.stop_agent()
-        self.exit()
+    # Actions removed - using on_key() for direct control
 
     async def on_navigation_hint(self, message: NavigationHint) -> None:
         self.status_bar.update_action(message.action)
@@ -215,6 +200,7 @@ class AgentTUI(App[None]):
             self.control_panel.stop_button,
             self.control_panel.task_manager_button,
             self.control_panel.thinking_button,
+            self.control_panel.view_code_button,
             self.control_panel.model_config_button,
             self.control_panel.verification_button,
             self.control_panel.model_button,
@@ -274,10 +260,15 @@ class AgentTUI(App[None]):
     # ------------------------------------------------------------------
 
     def show_menu(self) -> None:
-        """Show the main menu and hide detail view."""
+        """Show the main menu and hide detail/code views."""
         self._in_detail_mode = False
+        self._in_code_view = False
         self.menu_container.display = True
         self.detail_view.display = False
+        if hasattr(self, 'code_viewer'):
+            self.code_viewer.display = False
+        if hasattr(self, 'file_selector'):
+            self.file_selector.display = False
         self.show_status("Returned to menu")
 
     def show_detail(self, action_name: str, status: str = "Working...") -> None:
@@ -545,6 +536,7 @@ class AgentTUI(App[None]):
                 operation = data.get("operation", "")
                 lines = data.get("lines_changed", 0)
                 self.detail_view.add_log(f"  {operation.upper()}: {file_path} ({lines} lines)")
+                self.detail_view.add_log(f"  [dim]→ Type 'view {file_path}' to open in editor[/dim]")
             elif event.event_type == "error":
                 error_type = data.get("error_type", "")
                 message = data.get("message", "")
@@ -674,6 +666,30 @@ class AgentTUI(App[None]):
 
         # Trigger download via control file
         self._write_control("download_model", model_name)
+
+    def open_code_viewer(self, file_path: Path) -> None:
+        """Open a file in the code viewer.
+
+        Args:
+            file_path: Path to file to view/edit
+        """
+        self._in_code_view = True
+        self._in_detail_mode = False
+        self.menu_container.display = False
+        self.detail_view.display = False
+        self.code_viewer.display = True
+
+        success = self.code_viewer.load_file(file_path)
+        if not success:
+            self.show_status(f"Failed to load {file_path}", duration=3.0)
+            self.show_menu()
+
+    def open_file_selector(self) -> None:
+        """Open the file selector dialog."""
+        self._in_detail_mode = True
+        self.menu_container.display = False
+        self.detail_view.display = False
+        self.file_selector.display = True
 
 
 def launch_app() -> int:

@@ -119,6 +119,14 @@ class VerificationButton(NavigationItem):
         getattr(self.app, "open_verification_config", lambda: None)()
 
 
+class ViewCodeButton(NavigationItem):
+    def __init__(self) -> None:
+        super().__init__("View/Edit Code - Open files in editor", "View code", id="control-view-code")
+
+    def handle_enter(self) -> None:  # type: ignore[override]
+        getattr(self.app, "open_file_selector", lambda: None)()
+
+
 class ControlPanel(Static):
     def __init__(self) -> None:
         super().__init__(id="control-panel")
@@ -136,6 +144,7 @@ class ControlPanel(Static):
         self.thinking_button = ThinkingViewButton()
         self.model_config_button = ModelConfigButton()
         self.verification_button = VerificationButton()
+        self.view_code_button = ViewCodeButton()
 
     def compose(self):
         yield Vertical(
@@ -150,6 +159,7 @@ class ControlPanel(Static):
             Label("\n─── Advanced Features ───", classes="separator"),
             self.task_manager_button,
             self.thinking_button,
+            self.view_code_button,
             self.model_config_button,
             self.verification_button,
             Label("\n─── Actions ───", classes="separator"),

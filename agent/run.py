@@ -595,12 +595,28 @@ def compose_prompt(
     sections.append("Task:\n")
     sections.append(
         "You are an offline-first autonomous engineer operating on this repository."
-        " Review the context above (git status, prior commands, session scope) and propose the safest patch"
-        " that progresses the current goals. Keep changes minimal, compilable, and focused on the scope."
-        " Follow our commit policy: produce only git-style unified diffs, no commentary."
+        " Review ALL context above (git status, test results, linter output, prior commands, session scope)"
+        " and propose the safest patch that progresses the current goals.\n\n"
+        "Guidelines:\n"
+        "- Keep changes minimal, compilable, and focused on the scope\n"
+        "- Address any failing tests or linter errors shown above\n"
+        "- Make thoughtful, deliberate changes - explain your reasoning\n"
+        "- Consider edge cases and error handling\n"
+        "- Ensure backward compatibility where applicable\n"
+        "- Follow the codebase's existing patterns and style\n"
+        "- Add tests for new functionality\n"
+        "- Update documentation if interfaces change\n\n"
+        "Your changes will go through comprehensive verification:\n"
+        "- Syntax validation\n"
+        "- Test suite execution\n"
+        "- Security scanning\n"
+        "- Linting and type checking\n"
+        "- Code coverage analysis\n\n"
+        "Think through your approach before generating the diff."
     )
     sections.append("\nOutput format:\n")
-    sections.append("Return ONLY a unified diff fenced with ```diff ...```. Include full file contents for new files.")
+    sections.append("Return ONLY a unified diff fenced with ```diff ...```. Include full file contents for new files.\n"
+                   "The diff should be production-ready and pass all quality gates.")
     prompt = "\n".join(sections)
     write_text(str(cycle_dir / "prompt.md"), prompt)
     return prompt
