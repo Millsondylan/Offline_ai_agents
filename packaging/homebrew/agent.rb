@@ -8,16 +8,14 @@ class Agent < Formula
   depends_on "python@3.12"
 
   def install
-    virtualenv_create(libexec, "python3.12")
-    system libexec/"bin/pip", "install", "-v", "--no-deps",
-           "--ignore-installed",
-           buildpath
-    system libexec/"bin/pip", "install", "-v",
-           "textual>=0.47.0",
-           "watchdog>=3.0.0",
-           "requests>=2.31.0",
-           "keyring>=24.0.0"
-    bin.install_symlink libexec/"bin/agent"
+    virtualenv_install_with_resources using: "python@3.12" do
+      # Install additional dependencies explicitly
+      system libexec/"bin/pip", "install",
+             "textual>=0.47.0",
+             "watchdog>=3.0.0",
+             "requests>=2.31.0",
+             "keyring>=24.0.0"
+    end
   end
 
   service do
