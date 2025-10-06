@@ -47,9 +47,20 @@ class GateStatusPanel(Static):
                 yield self.gates_container
 
     def update_gates(self, gates: List[GateState]) -> None:
-        existing = list(self.gates_container.children)
-        for child in existing:
-            child.remove()
+        # Check if we need to update (avoid duplicate IDs)
+        existing_ids = {child.id for child in self.gates_container.children if hasattr(child, 'id') and child.id}
+        new_ids = {f"gate-{index}" for index in range(len(gates))}
+
+        if existing_ids == new_ids:
+            return
+
+        # Clear existing
+        for child in list(self.gates_container.children):
+            try:
+                child.remove()
+            except Exception:
+                pass
+
         self._nav_entries = []
         if not gates:
             if self._empty_label is None:
@@ -58,8 +69,13 @@ class GateStatusPanel(Static):
                 self.gates_container.mount(self._empty_label)
             self.refresh()
             return
-        if self._empty_label is not None and self._empty_label in self.gates_container.children:
-            self._empty_label.remove()
+
+        if self._empty_label is not None:
+            try:
+                self._empty_label.remove()
+            except Exception:
+                pass
+
         for index, gate in enumerate(gates):
             icon = _GATE_ICONS.get(gate.status.lower(), "⏳")
             label = f"{icon} {gate.name}"

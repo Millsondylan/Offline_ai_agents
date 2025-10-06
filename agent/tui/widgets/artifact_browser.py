@@ -36,9 +36,20 @@ class ArtifactBrowser(Static):
                 yield self.container
 
     def update_artifacts(self, artifacts: List[ArtifactState]) -> None:
-        existing = list(self.container.children)
-        for child in existing:
-            child.remove()
+        # Check if we need to update
+        existing_count = sum(1 for child in self.container.children if hasattr(child, 'id') and child.id and child.id.startswith('artifact-'))
+        new_count = len(artifacts)
+
+        if existing_count == new_count and existing_count > 0:
+            return
+
+        # Clear existing
+        for child in list(self.container.children):
+            try:
+                child.remove()
+            except Exception:
+                pass
+
         self._nav_entries = []
         if not artifacts:
             if self._empty_label is None:
@@ -47,8 +58,7 @@ class ArtifactBrowser(Static):
                 self.container.mount(self._empty_label)
             self.refresh()
             return
-        if self._empty_label is not None and self._empty_label in self.container.children:
-            self._empty_label.remove()
+
         current_folder: str | None = None
         counter = 0
         for artifact in artifacts:

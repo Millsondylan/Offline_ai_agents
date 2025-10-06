@@ -89,11 +89,30 @@ class TaskQueue(Static):
             yield self.new_task_button
 
     def update_tasks(self, tasks: List[TaskState]) -> None:
-        existing = list(self.tasks_container.children)
-        for child in existing:
+        # Only remove if actually changing
+        # Avoid duplicate ID errors by checking if we need to update
+        existing_ids = set()
+        for child in self.tasks_container.children:
+            if hasattr(child, 'id') and child.id:
+                existing_ids.add(child.id)
+
+        # Build new task IDs
+        new_ids = {f"task-{index}" for index in range(len(tasks))}
+
+        # Only update if different
+        if existing_ids == new_ids:
+            return
+
+        # Clear all existing task buttons (but keep input if present)
+        for child in list(self.tasks_container.children):
             if self.new_task_input is not None and child is self.new_task_input:
                 continue
-            child.remove()
+            if self._empty_label is not None and child is self._empty_label:
+                continue
+            try:
+                child.remove()
+            except Exception:
+                pass
 
         self._nav_entries = []
         if not tasks:
@@ -103,8 +122,13 @@ class TaskQueue(Static):
                 self.tasks_container.mount(self._empty_label)
             self.refresh()
             return
-        if self._empty_label is not None and self._empty_label in self.tasks_container.children:
-            self._empty_label.remove()
+
+        if self._empty_label is not None:
+            try:
+                self._empty_label.remove()
+            except Exception:
+                pass
+
         for index, task in enumerate(tasks):
             icon = _STATUS_ICON.get(task.status.lower(), "□")
             label = f"{icon} {task.title}"
