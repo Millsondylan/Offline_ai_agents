@@ -9,6 +9,7 @@ from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual.widgets import Label
 
 from .navigation import NavEntry, NavigationHint, NavigationManager
 from .state_watcher import ArtifactState, StateWatcher
