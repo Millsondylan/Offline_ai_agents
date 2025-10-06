@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2025-10-06
+
+### Fixed
+- **Critical**: TUI entry point now launches the complete TUI (app.py) instead of the old simple TUI
+  - Users now get the full-featured interface with all v0.3.0 features
+  - Fixed agent/view.py to import from .tui.app instead of .tui.simple_app
+  - Improved error messages for TUI initialization failures
+
 ## [0.3.0] - 2025-10-06
 
 ### Added
