@@ -78,12 +78,17 @@ class AgentTUI(App[None]):
         await self.poll_state()
         self.set_interval(0.5, self.poll_state)
         self.rebuild_navigation()
+
         # Focus the app so it receives keyboard events
         self.set_focus(None)
 
+        # Apply initial focus after everything is mounted
+        if self.navigation.entries:
+            self.navigation._apply_focus()
+
         # Show initial status
         entry_count = len(self.navigation.entries)
-        self.show_status(f"Ready! {entry_count} items to navigate. Use ↑↓ arrows, ENTER to activate.")
+        self.show_status(f"Ready! {entry_count} items. Use ↑↓ to navigate, ENTER to activate, ESC to exit.")
 
     # ------------------------------------------------------------------
     # Input & navigation handling

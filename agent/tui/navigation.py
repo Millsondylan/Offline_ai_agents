@@ -114,6 +114,10 @@ class NavigationManager:
 
     def _apply_focus(self) -> None:
         """Apply focus styling to current element."""
+        # Skip if app isn't mounted yet
+        if not hasattr(self.app, "is_mounted") or not self.app.is_mounted:
+            return
+
         # Remove focus from all
         removed_count = 0
         for entry in self.entries:
@@ -135,20 +139,27 @@ class NavigationManager:
                 widget.refresh()
 
                 # Scroll to keep focused widget visible
-                widget.scroll_visible(animate=False)
+                try:
+                    widget.scroll_visible(animate=False)
+                except Exception:
+                    pass  # Scrolling might fail if widget isn't in a scrollable container
 
                 # Debug: confirm focus was applied
-                if hasattr(self.app, "show_status"):
-                    classes = " ".join(widget.classes)
-                    self.app.show_status(
-                        f"Focused: {entry.widget_id} [{self.current_index + 1}/{len(self.entries)}] (classes: {classes})"
-                    )
+                if hasattr(self.app, "_status_timer"):  # Check if app is fully initialized
+                    try:
+                        classes = " ".join(widget.classes)
+                        # Use status bar directly to avoid timer issues
+                        if hasattr(self.app, "status_bar"):
+                            self.app.status_bar.update_action(
+                                f"[{self.current_index + 1}/{len(self.entries)}] {entry.widget_id} → {entry.action}"
+                            )
+                    except Exception:
+                        pass
 
                 if self.on_focus_change:
                     self.on_focus_change(entry)
-            except Exception as e:
-                if hasattr(self.app, "show_status"):
-                    self.app.show_status(f"Focus error on {entry.widget_id}: {e}")
+            except Exception:
+                pass  # Silently skip focus errors during initialization
 
 
 class NavigationHint:
