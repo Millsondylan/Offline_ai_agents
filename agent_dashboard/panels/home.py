@@ -6,6 +6,9 @@ from agent_dashboard.panels.base import BasePanel
 class HomePanel(BasePanel):
     """Home dashboard showing welcome and overview."""
 
+    def __init__(self, agent_manager, theme_manager):
+        super().__init__("Home", agent_manager, theme_manager)
+
     def render(self, win, start_y: int, start_x: int, height: int, width: int):
         """Render home dashboard."""
         state = self.agent_manager.get_state()

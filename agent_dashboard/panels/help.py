@@ -6,6 +6,9 @@ from agent_dashboard.panels.base import BasePanel
 class HelpPanel(BasePanel):
     """Help/shortcuts panel."""
 
+    def __init__(self, agent_manager, theme_manager):
+        super().__init__("Help", agent_manager, theme_manager)
+
     def render(self, win, start_y: int, start_x: int, height: int, width: int):
         """Render help text."""
         y = start_y + 1
