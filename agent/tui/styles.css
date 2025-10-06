@@ -86,15 +86,16 @@ Screen {
     padding: 0 1;
 }
 
-/* Navigation focus states */
+/* Navigation focus states - HIGHLY VISIBLE */
 .focused {
-    border: heavy $success;
-    background: $boost;
-    text-style: bold;
+    border: heavy yellow !important;
+    background: blue !important;
+    color: white !important;
+    text-style: bold reverse !important;
 }
 
 .focused:hover {
-    background: $warning;
+    background: magenta !important;
 }
 
 /* Button styles */
@@ -102,27 +103,33 @@ Button {
     width: auto;
     height: auto;
     margin: 0 1;
+    border: solid white;
+    background: $surface;
+    color: $text;
 }
 
 Button.focused {
-    border: heavy cyan;
-    background: $boost;
-    text-style: bold;
+    border: heavy yellow !important;
+    background: blue !important;
+    color: white !important;
+    text-style: bold reverse !important;
 }
 
 NavigationItem {
     width: 100%;
     height: auto;
-    border: none;
-    background: transparent;
+    border: solid $primary;
+    background: $surface;
     text-align: left;
     padding: 0 1;
+    margin: 0 0 1 0;
 }
 
 NavigationItem.focused {
-    border: solid cyan;
-    background: $boost;
-    text-style: bold;
+    border: heavy yellow !important;
+    background: blue !important;
+    color: white !important;
+    text-style: bold reverse !important;
 }
 
 /* Task items */

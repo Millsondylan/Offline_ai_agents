@@ -64,11 +64,26 @@ class AgentTUI(App[None]):
         )
 
     async def on_mount(self) -> None:
+        # Load test data if state directory is empty
+        session_file = self.state_watcher.state_root / "session.json"
+        if not session_file.exists():
+            self.show_status("Loading test data...")
+            try:
+                from .test_data_generator import generate_test_data
+                generate_test_data()
+                self.show_status("Test data loaded - navigate with ↑↓ arrows")
+            except Exception as e:
+                self.show_status(f"Note: No test data - {e}")
+
         await self.poll_state()
         self.set_interval(0.5, self.poll_state)
         self.rebuild_navigation()
         # Focus the app so it receives keyboard events
         self.set_focus(None)
+
+        # Show initial status
+        entry_count = len(self.navigation.entries)
+        self.show_status(f"Ready! {entry_count} items to navigate. Use ↑↓ arrows, ENTER to activate.")
 
     # ------------------------------------------------------------------
     # Input & navigation handling
@@ -76,30 +91,22 @@ class AgentTUI(App[None]):
 
     async def on_key(self, event: events.Key) -> None:
         """Handle all key presses."""
-        # Debug: show what we have
-        entry_count = len(self.navigation.entries)
-        current = self.navigation.current_index
-        focused = self.navigation.get_focused()
-
         if event.key == "up":
             event.prevent_default()
             event.stop()
-            self.show_status(f"Up ({current}/{entry_count}): {focused.widget_id if focused else 'none'}")
             self.navigation.focus_previous()
         elif event.key == "down":
             event.prevent_default()
             event.stop()
-            self.show_status(f"Down ({current}/{entry_count}): {focused.widget_id if focused else 'none'}")
             self.navigation.focus_next()
         elif event.key == "enter":
             event.prevent_default()
             event.stop()
-            self.show_status(f"Enter on: {focused.widget_id if focused else 'none'}")
             self.navigation.activate_focused()
         elif event.key == "escape":
             event.prevent_default()
             event.stop()
-            self.show_status("Escape pressed")
+            self.show_status("Exiting...")
             self.stop_agent()
             self.exit()
 
@@ -148,7 +155,12 @@ class AgentTUI(App[None]):
         return entries
 
     def rebuild_navigation(self) -> None:
-        self.navigation.set_entries(self._build_navigation_order())
+        entries = self._build_navigation_order()
+        self.navigation.set_entries(entries)
+
+        # Ensure something is focused initially
+        if entries and self.navigation.current_index == 0:
+            self.navigation._apply_focus()
 
     # ------------------------------------------------------------------
     # State polling & updates

@@ -115,10 +115,12 @@ class NavigationManager:
     def _apply_focus(self) -> None:
         """Apply focus styling to current element."""
         # Remove focus from all
+        removed_count = 0
         for entry in self.entries:
             try:
                 widget = self.app.query_one(f"#{entry.widget_id}")
                 widget.remove_class("focused")
+                removed_count += 1
             except Exception:
                 pass
 
@@ -129,13 +131,24 @@ class NavigationManager:
                 widget = self.app.query_one(f"#{entry.widget_id}")
                 widget.add_class("focused")
 
+                # Force refresh to ensure CSS is applied
+                widget.refresh()
+
                 # Scroll to keep focused widget visible
                 widget.scroll_visible(animate=False)
 
+                # Debug: confirm focus was applied
+                if hasattr(self.app, "show_status"):
+                    classes = " ".join(widget.classes)
+                    self.app.show_status(
+                        f"Focused: {entry.widget_id} [{self.current_index + 1}/{len(self.entries)}] (classes: {classes})"
+                    )
+
                 if self.on_focus_change:
                     self.on_focus_change(entry)
-            except Exception:
-                pass
+            except Exception as e:
+                if hasattr(self.app, "show_status"):
+                    self.app.show_status(f"Focus error on {entry.widget_id}: {e}")
 
 
 class NavigationHint:
