@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import List, Optional
 
@@ -185,6 +186,20 @@ class AgentTUI(App[None]):
     def rebuild_navigation(self) -> None:
         entries = self._build_navigation_order()
         self.navigation.set_entries(entries)
+
+        # Add visible numbers to first 10 items
+        for i, entry in enumerate(entries[:10]):
+            try:
+                widget = self.query_one(f"#{entry.widget_id}")
+                if hasattr(widget, "set_display"):
+                    display_num = i + 1 if i < 9 else 0
+                    # Get current label without any existing number prefix
+                    current_label = str(widget.label)
+                    # Remove existing [digit] prefix if present
+                    current_label = re.sub(r'^\[\d\]\s*', '', current_label)
+                    widget.set_display(f"[{display_num}] {current_label}")
+            except Exception:
+                pass  # Widget might not exist yet
 
         # Ensure something is focused initially
         if entries and self.navigation.current_index == 0:

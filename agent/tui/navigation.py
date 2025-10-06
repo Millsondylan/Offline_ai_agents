@@ -159,14 +159,8 @@ class NavigationManager:
                     try:
                         # Use status bar directly to avoid timer issues
                         if hasattr(self.app, "status_bar"):
-                            # Show number if in first 10 items
-                            num_str = ""
-                            if self.current_index < 10:
-                                display_num = self.current_index + 1 if self.current_index < 9 else 0
-                                num_str = f"[{display_num}] "
-
                             self.app.status_bar.update_action(
-                                f"{num_str}({self.current_index + 1}/{len(self.entries)}) {entry.action}"
+                                f"({self.current_index + 1}/{len(self.entries)}) {entry.action}"
                             )
                     except Exception:
                         pass
