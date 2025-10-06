@@ -9,6 +9,7 @@ from ..state_watcher import CycleState
 class CycleInfoPanel(Static):
     def __init__(self) -> None:
         super().__init__(id="cycle-info")
+        self.title = Label("═══ CYCLE INFO ═══", classes="panel-title")
         self.cycle_label = Label("Cycle: --", id="cycle-number")
         self.phase_label = Label("Phase: waiting", id="cycle-phase")
         self.timer_label = Label("Elapsed: 0s | ETA: --", id="cycle-timer")
@@ -16,6 +17,7 @@ class CycleInfoPanel(Static):
 
     def compose(self):
         yield Vertical(
+            self.title,
             self.cycle_label,
             self.phase_label,
             self.timer_label,

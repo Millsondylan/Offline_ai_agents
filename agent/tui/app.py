@@ -176,10 +176,12 @@ class AgentTUI(App[None]):
     def _build_navigation_order(self) -> List[NavEntry]:
         entries: List[NavEntry] = []
         buttons = [
+            self.control_panel.start_button,
             self.control_panel.pause_button,
             self.control_panel.stop_button,
             self.control_panel.model_button,
             self.control_panel.commit_button,
+            self.control_panel.logs_button,
         ]
         for button in buttons:
             if button.id:
@@ -233,6 +235,10 @@ class AgentTUI(App[None]):
     # Control helpers
     # ------------------------------------------------------------------
 
+    def start_agent(self) -> None:
+        self._write_control("start")
+        self.show_status("Start command sent")
+
     def pause_agent(self) -> None:
         self._write_control("pause")
         self.show_status("Pause command sent")
@@ -282,6 +288,11 @@ class AgentTUI(App[None]):
             self.show_status(f"Opened {artifact.label}")
         except Exception as exc:  # pragma: no cover - defensive
             self.show_status(f"Failed to open artifact: {exc}")
+
+    def open_logs(self) -> None:
+        """Open the logs viewer tab."""
+        self.output_viewer.select_tab("logs")
+        self.show_status("Opened logs viewer")
 
     def save_config(self, config: dict) -> None:
         text = json.dumps(config, indent=2, sort_keys=True)

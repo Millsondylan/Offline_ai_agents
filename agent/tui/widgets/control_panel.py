@@ -30,6 +30,14 @@ class PauseResumeButton(NavigationItem):
             getattr(self.app, "resume_agent", lambda: None)()
 
 
+class StartButton(NavigationItem):
+    def __init__(self) -> None:
+        super().__init__("[Start Agent]", "Start agent", id="control-start")
+
+    def handle_enter(self) -> None:  # type: ignore[override]
+        getattr(self.app, "start_agent", lambda: None)()
+
+
 class StopButton(NavigationItem):
     def __init__(self) -> None:
         super().__init__("[Stop]", "Stop agent", id="control-stop")
@@ -71,26 +79,40 @@ class ForceCommitButton(NavigationItem):
         getattr(self.app, "force_commit", lambda: None)()
 
 
+class ViewLogsButton(NavigationItem):
+    def __init__(self) -> None:
+        super().__init__("[View Logs]", "Open logs viewer", id="control-logs")
+
+    def handle_enter(self) -> None:  # type: ignore[override]
+        getattr(self.app, "open_logs", lambda: None)()
+
+
 class ControlPanel(Static):
     def __init__(self) -> None:
         super().__init__(id="control-panel")
+        self.title = Label("═══ CONTROLS ═══", classes="panel-title")
         self.status_label = Label("● IDLE", id="status-label")
         self.provider_label = Label("Provider: --", id="provider-label")
         self.session_label = Label("Session: 0s | Cycle: --", id="session-label")
+        self.start_button = StartButton()
         self.pause_button = PauseResumeButton()
         self.stop_button = StopButton()
         self.model_button = ModelSwitcherButton()
         self.commit_button = ForceCommitButton()
+        self.logs_button = ViewLogsButton()
 
     def compose(self):
         yield Vertical(
+            self.title,
             self.status_label,
             self.provider_label,
             self.session_label,
+            self.start_button,
             self.pause_button,
             self.stop_button,
             self.model_button,
             self.commit_button,
+            self.logs_button,
             id="control-panel-body",
         )
 
