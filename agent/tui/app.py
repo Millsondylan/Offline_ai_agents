@@ -29,10 +29,21 @@ class AgentTUI(App[None]):
     can_focus = True
 
     BINDINGS = [
-        Binding("up", "focus_previous", "Previous", priority=True),
-        Binding("down", "focus_next", "Next", priority=True),
-        Binding("enter", "activate", "Activate", priority=True),
-        Binding("escape", "quit_app", "Exit", priority=True),
+        Binding("up,k", "focus_previous", "Previous", priority=True),
+        Binding("down,j", "focus_next", "Next", priority=True),
+        Binding("enter,space", "activate", "Activate", priority=True),
+        Binding("escape,q", "quit_app", "Exit", priority=True),
+        Binding("1", "jump_to", "Jump to 1", priority=True),
+        Binding("2", "jump_to", "Jump to 2", priority=True),
+        Binding("3", "jump_to", "Jump to 3", priority=True),
+        Binding("4", "jump_to", "Jump to 4", priority=True),
+        Binding("5", "jump_to", "Jump to 5", priority=True),
+        Binding("6", "jump_to", "Jump to 6", priority=True),
+        Binding("7", "jump_to", "Jump to 7", priority=True),
+        Binding("8", "jump_to", "Jump to 8", priority=True),
+        Binding("9", "jump_to", "Jump to 9", priority=True),
+        Binding("0", "jump_to", "Jump to 10", priority=True),
+        Binding("h,question_mark", "show_help", "Help", priority=True),
     ]
 
     def __init__(self) -> None:
@@ -96,24 +107,36 @@ class AgentTUI(App[None]):
 
     async def on_key(self, event: events.Key) -> None:
         """Handle all key presses."""
-        if event.key == "up":
+        # Vim-style navigation
+        if event.key in ("up", "k"):
             event.prevent_default()
             event.stop()
             self.navigation.focus_previous()
-        elif event.key == "down":
+        elif event.key in ("down", "j"):
             event.prevent_default()
             event.stop()
             self.navigation.focus_next()
-        elif event.key == "enter":
+        elif event.key in ("enter", "space"):
             event.prevent_default()
             event.stop()
             self.navigation.activate_focused()
-        elif event.key == "escape":
+        elif event.key in ("escape", "q"):
             event.prevent_default()
             event.stop()
             self.show_status("Exiting...")
             self.stop_agent()
             self.exit()
+        # Number keys for direct jump
+        elif event.key in ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"):
+            event.prevent_default()
+            event.stop()
+            num = 10 if event.key == "0" else int(event.key)
+            self.navigation.jump_to_index(num - 1)
+        # Help
+        elif event.key in ("h", "question_mark"):
+            event.prevent_default()
+            event.stop()
+            self.show_help()
 
     def action_focus_next(self) -> None:
         """Move to next focusable element."""
@@ -262,6 +285,20 @@ class AgentTUI(App[None]):
     def _reset_status(self) -> None:
         self.status_bar.update_action(None)
         self._status_timer = None
+
+    def show_help(self) -> None:
+        """Show keyboard shortcuts."""
+        help_text = (
+            "KEYBOARD SHORTCUTS:\n"
+            "  1-9,0   Jump to item by number\n"
+            "  ↑/k     Move up\n"
+            "  ↓/j     Move down\n"
+            "  ENTER   Execute/Select\n"
+            "  SPACE   Execute/Select\n"
+            "  q/ESC   Quit\n"
+            "  h/?     This help"
+        )
+        self.show_status(help_text, duration=10.0)
 
 
 def launch_app() -> int:

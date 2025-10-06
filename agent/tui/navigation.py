@@ -89,6 +89,16 @@ class NavigationManager:
         self.current_index = (self.current_index - 1) % len(self.entries)
         self._apply_focus()
 
+    def jump_to_index(self, index: int) -> None:
+        """Jump directly to a specific index."""
+        if not self.entries:
+            return
+        if 0 <= index < len(self.entries):
+            self.current_index = index
+            self._apply_focus()
+        elif hasattr(self.app, "show_status"):
+            self.app.show_status(f"No item #{index + 1} (only {len(self.entries)} items)")
+
     def get_focused(self) -> Optional[NavEntry]:
         """Get currently focused navigation entry."""
         if not self.entries or self.current_index >= len(self.entries):
@@ -144,14 +154,19 @@ class NavigationManager:
                 except Exception:
                     pass  # Scrolling might fail if widget isn't in a scrollable container
 
-                # Debug: confirm focus was applied
+                # Show current position and action
                 if hasattr(self.app, "_status_timer"):  # Check if app is fully initialized
                     try:
-                        classes = " ".join(widget.classes)
                         # Use status bar directly to avoid timer issues
                         if hasattr(self.app, "status_bar"):
+                            # Show number if in first 10 items
+                            num_str = ""
+                            if self.current_index < 10:
+                                display_num = self.current_index + 1 if self.current_index < 9 else 0
+                                num_str = f"[{display_num}] "
+
                             self.app.status_bar.update_action(
-                                f"[{self.current_index + 1}/{len(self.entries)}] {entry.widget_id} → {entry.action}"
+                                f"{num_str}({self.current_index + 1}/{len(self.entries)}) {entry.action}"
                             )
                     except Exception:
                         pass
