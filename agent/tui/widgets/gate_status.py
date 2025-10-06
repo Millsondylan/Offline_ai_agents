@@ -32,7 +32,7 @@ class GateButton(NavigationItem):
 class GateStatusPanel(Static):
     def __init__(self) -> None:
         super().__init__(id="gate-panel")
-        self.title = Label("Gates & Safety", id="gate-title")
+        self.title = Label("═══ GATES & SAFETY ═══", classes="panel-title")
         self.gates_scroll = VerticalScroll(id="gates-scroll")
         self.gates_container = Vertical(id="gates-container")
         self._nav_entries: List[NavEntry] = []

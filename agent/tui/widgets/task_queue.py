@@ -70,7 +70,7 @@ class TaskNameInput(Input):
 class TaskQueue(Static):
     def __init__(self) -> None:
         super().__init__(id="task-queue")
-        self.title = Label("Task Queue", id="tasks-title")
+        self.title = Label("═══ TASKS ═══", classes="panel-title")
         self.tasks_scroll = VerticalScroll(id="tasks-scroll")
         self.tasks_container = Vertical(id="tasks-container")
         self.new_task_button = NewTaskButton(self)

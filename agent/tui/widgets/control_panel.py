@@ -87,13 +87,10 @@ class ControlPanel(Static):
             self.status_label,
             self.provider_label,
             self.session_label,
-            Horizontal(
-                self.pause_button,
-                self.stop_button,
-                self.model_button,
-                self.commit_button,
-                id="control-buttons",
-            ),
+            self.pause_button,
+            self.stop_button,
+            self.model_button,
+            self.commit_button,
             id="control-panel-body",
         )
 

@@ -20,14 +20,22 @@ Screen {
 }
 
 #control-panel {
-    width: 40%;
+    width: 50%;
     height: auto;
     border: solid $primary;
     padding: 1;
 }
 
+#control-panel-body {
+    height: auto;
+}
+
+#control-panel NavigationItem {
+    margin: 0 0 1 0;
+}
+
 #cycle-info {
-    width: 60%;
+    width: 50%;
     height: auto;
     border: solid $primary;
     padding: 1;
@@ -40,24 +48,32 @@ Screen {
 }
 
 #task-queue {
-    width: 30%;
-    height: 100%;
-    border: solid $secondary;
-    padding: 1;
+    width: 100%;
+    height: auto;
+    border: none;
+    padding: 0;
 }
 
 #gate-status {
-    width: 30%;
-    height: 100%;
-    border: solid $secondary;
-    padding: 1;
+    width: 100%;
+    height: auto;
+    border: none;
+    padding: 0;
 }
 
 #artifact-browser {
-    width: 40%;
-    height: 100%;
-    border: solid $secondary;
-    padding: 1;
+    width: 100%;
+    height: auto;
+    border: none;
+    padding: 0;
+}
+
+#task-queue .panel-title,
+#gate-status .panel-title,
+#artifact-browser .panel-title {
+    color: cyan;
+    text-style: bold;
+    margin: 1 0;
 }
 
 /* Output viewer */
@@ -117,12 +133,14 @@ Button.focused {
 
 NavigationItem {
     width: 100%;
-    height: auto;
+    height: 3;
+    min-height: 3;
     border: solid $primary;
     background: $surface;
     text-align: left;
-    padding: 0 1;
-    margin: 0 0 1 0;
+    content-align: left middle;
+    padding: 0 2;
+    margin: 0;
 }
 
 NavigationItem.focused {
@@ -130,6 +148,20 @@ NavigationItem.focused {
     background: blue !important;
     color: white !important;
     text-style: bold reverse !important;
+}
+
+#menu-section {
+    height: 1fr;
+    overflow-y: auto;
+    border: heavy cyan;
+    padding: 1;
+}
+
+#menu-header {
+    height: auto;
+    text-align: center;
+    color: cyan;
+    text-style: bold;
 }
 
 /* Task items */

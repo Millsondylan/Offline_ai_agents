@@ -68,9 +68,15 @@ class AgentTUI(App[None]):
 
     def compose(self) -> ComposeResult:
         yield Vertical(
+            Label("AGENT DASHBOARD", classes="panel-title"),
             Horizontal(self.control_panel, self.cycle_panel, id="row-top"),
-            Horizontal(self.task_queue, self.gate_panel, self.artifact_browser, id="row-middle"),
-            self.output_viewer,
+            Label("\n" + "═" * 80 + "\nMENU - Press number to jump, ↑↓/jk to navigate, ENTER/SPACE to select\n" + "═" * 80, id="menu-header"),
+            Vertical(
+                self.task_queue,
+                self.gate_panel,
+                self.artifact_browser,
+                id="menu-section"
+            ),
             self.status_bar,
             id="layout-root",
         )

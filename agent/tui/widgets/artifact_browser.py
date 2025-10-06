@@ -21,7 +21,7 @@ class ArtifactButton(NavigationItem):
 class ArtifactBrowser(Static):
     def __init__(self) -> None:
         super().__init__(id="artifact-browser")
-        self.title = Label("Artifacts", id="artifact-title")
+        self.title = Label("═══ ARTIFACTS ═══", classes="panel-title")
         self.artifact_scroll = VerticalScroll(id="artifact-scroll")
         self.container = Vertical(id="artifact-container")
         self._nav_entries: List[NavEntry] = []
