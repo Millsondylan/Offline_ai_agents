@@ -17,6 +17,7 @@ from .widgets.artifact_browser import ArtifactBrowser
 from .widgets.cycle_info import CycleInfoPanel
 from .widgets.gate_status import GateStatusPanel
 from .widgets.control_panel import ControlPanel
+from .widgets.detail_view import DetailView
 from .widgets.output_viewer import OutputViewer
 from .widgets.status_bar import StatusBar
 from .widgets.task_queue import TaskQueue
@@ -58,8 +59,10 @@ class AgentTUI(App[None]):
         self.gate_panel = GateStatusPanel()
         self.artifact_browser = ArtifactBrowser()
         self.output_viewer = OutputViewer()
+        self.detail_view = DetailView()
         self.status_bar = StatusBar()
         self._status_timer = None
+        self._in_detail_mode = False
         self.control_root = Path(__file__).resolve().parent.parent / "local" / "control"
         self.config_path = Path(__file__).resolve().parent.parent / "config.json"
 
@@ -68,7 +71,7 @@ class AgentTUI(App[None]):
     # ------------------------------------------------------------------
 
     def compose(self) -> ComposeResult:
-        yield Vertical(
+        self.menu_container = Vertical(
             Label("AGENT DASHBOARD", classes="panel-title"),
             Horizontal(self.control_panel, self.cycle_panel, id="row-top"),
             Label("\n" + "═" * 80 + "\nMENU - Press number to jump, ↑↓/jk to navigate, ENTER/SPACE to select\n" + "═" * 80, id="menu-header"),
@@ -78,6 +81,15 @@ class AgentTUI(App[None]):
                 self.artifact_browser,
                 id="menu-section"
             ),
+            id="menu-container"
+        )
+
+        # Detail view starts hidden
+        self.detail_view.display = False
+
+        yield Vertical(
+            self.menu_container,
+            self.detail_view,
             self.status_bar,
             id="layout-root",
         )
@@ -115,6 +127,14 @@ class AgentTUI(App[None]):
 
     async def on_key(self, event: events.Key) -> None:
         """Handle all key presses."""
+        # In detail mode, only ESC/q work to go back
+        if self._in_detail_mode:
+            if event.key in ("escape", "q"):
+                event.prevent_default()
+                event.stop()
+                self.show_menu()
+            return
+
         # Vim-style navigation
         if event.key in ("up", "k"):
             event.prevent_default()
@@ -232,38 +252,99 @@ class AgentTUI(App[None]):
         self.rebuild_navigation()
 
     # ------------------------------------------------------------------
+    # View mode switching
+    # ------------------------------------------------------------------
+
+    def show_menu(self) -> None:
+        """Show the main menu and hide detail view."""
+        self._in_detail_mode = False
+        self.menu_container.display = True
+        self.detail_view.display = False
+        self.show_status("Returned to menu")
+
+    def show_detail(self, action_name: str, status: str = "Working...") -> None:
+        """Show detail view and hide menu."""
+        self._in_detail_mode = True
+        self.menu_container.display = False
+        self.detail_view.display = True
+        self.detail_view.show_action(action_name, status)
+
+    # ------------------------------------------------------------------
     # Control helpers
     # ------------------------------------------------------------------
 
     def start_agent(self) -> None:
+        self.show_detail("Start Agent")
+        self.detail_view.add_log("Sending start command to agent...")
         self._write_control("start")
-        self.show_status("Start command sent")
+        self.detail_view.add_log("✓ Start command sent")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("The agent will begin autonomous operation.")
+        self.detail_view.add_log("Check the dashboard for progress updates.")
+        self.detail_view.show_success("Agent started")
 
     def pause_agent(self) -> None:
+        self.show_detail("Pause Agent")
+        self.detail_view.add_log("Sending pause command to agent...")
         self._write_control("pause")
-        self.show_status("Pause command sent")
+        self.detail_view.add_log("✓ Pause command sent")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("The agent will stop after completing the current operation.")
+        self.detail_view.show_success("Agent paused")
 
     def resume_agent(self) -> None:
+        self.show_detail("Resume Agent")
+        self.detail_view.add_log("Sending resume command to agent...")
         self._write_control("resume")
-        self.show_status("Resume command sent")
+        self.detail_view.add_log("✓ Resume command sent")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("The agent will continue from where it paused.")
+        self.detail_view.show_success("Agent resumed")
 
     def stop_agent(self) -> None:
+        self.show_detail("Stop Agent")
+        self.detail_view.add_log("Sending stop command to agent...")
         self._write_control("stop")
-        self.show_status("Stop command sent")
+        self.detail_view.add_log("✓ Stop command sent")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("The agent will terminate all operations.")
+        self.detail_view.add_log("[bold yellow]Note: Any in-progress tasks will be interrupted.[/bold yellow]")
+        self.detail_view.show_success("Agent stopped")
 
     def force_commit(self) -> None:
+        self.show_detail("Force Commit")
+        self.detail_view.add_log("Sending force commit command...")
         self._write_control("commit")
-        self.show_status("Force commit command sent")
+        self.detail_view.add_log("✓ Commit command sent")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("All pending changes will be committed to version control.")
+        self.detail_view.show_success("Commit initiated")
 
     def switch_model(self, model: str) -> None:
+        self.show_detail(f"Switch Model to {model}")
+        self.detail_view.add_log(f"Switching AI model to: [bold cyan]{model}[/bold cyan]")
         safe = model.lower().replace(" ", "_")
         self._write_control(f"switch_model_{safe}")
-        self.show_status(f"Switching model to {model}")
+        self.detail_view.add_log("✓ Model switch command sent")
+        self.detail_view.add_log("")
+        self.detail_view.add_log("The agent will use this model for future operations.")
+        self.detail_view.show_success(f"Switched to {model}")
 
     def toggle_task(self, task_id: str) -> None:
+        # Find task details from state
+        snapshot = self.state_watcher.snapshot()
+        task = next((t for t in snapshot.tasks if t.identifier == task_id), None)
+        if task:
+            self.detail_view.show_task_details(task_id, task.title, task.status)
+        else:
+            self.show_detail("Toggle Task")
+            self.detail_view.add_log(f"Task ID: {task_id}")
+
+        self.detail_view.add_log("")
         payload = f"toggle {task_id}"
         self._write_control("task_control", payload)
-        self.show_status(f"Toggled task {task_id}")
+        self.detail_view.add_log("✓ Task toggle command sent")
+        self.detail_view.show_success("Task status updated")
 
     def create_task(self, task_name: str) -> None:
         self._write_control("add_task", task_name)
@@ -278,21 +359,35 @@ class AgentTUI(App[None]):
         self.show_status("Rejecting all diffs…")
 
     def select_gate(self, gate_name: str) -> None:
-        self.output_viewer.filter_findings(gate_name)
-        self.output_viewer.select_tab("findings")
-        self.show_status(f"Viewing findings for {gate_name}")
+        # Find gate details from state
+        snapshot = self.state_watcher.snapshot()
+        gate = next((g for g in snapshot.gates if g.name == gate_name), None)
+
+        findings_text = snapshot.output.findings if snapshot.output.findings else "No findings available"
+
+        if gate:
+            self.detail_view.show_gate_details(gate.name, gate.status, findings_text)
+        else:
+            self.show_detail(f"Gate: {gate_name}")
+            self.detail_view.add_log(findings_text)
 
     def open_artifact(self, artifact: ArtifactState) -> None:
         try:
-            self.output_viewer.load_artifact(artifact)
-            self.show_status(f"Opened {artifact.label}")
+            # Read artifact content
+            content = artifact.path.read_text(encoding="utf-8") if artifact.path.exists() else "[File not found]"
+            self.detail_view.show_artifact(artifact.label, content)
         except Exception as exc:  # pragma: no cover - defensive
-            self.show_status(f"Failed to open artifact: {exc}")
+            self.show_detail(f"Artifact: {artifact.label}")
+            self.detail_view.show_error(f"Failed to load artifact: {exc}")
 
     def open_logs(self) -> None:
         """Open the logs viewer tab."""
-        self.output_viewer.select_tab("logs")
-        self.show_status("Opened logs viewer")
+        snapshot = self.state_watcher.snapshot()
+        self.show_detail("Agent Logs")
+        self.detail_view.add_log("[bold]Recent Logs:[/bold]")
+        self.detail_view.add_log("")
+        logs = snapshot.output.logs if snapshot.output.logs else "No logs available"
+        self.detail_view.add_log(logs)
 
     def save_config(self, config: dict) -> None:
         text = json.dumps(config, indent=2, sort_keys=True)

@@ -228,6 +228,50 @@ NavigationItem.focused {
     color: $text;
 }
 
+/* Detail view */
+#detail-view {
+    width: 100%;
+    height: 100%;
+    border: heavy cyan;
+    padding: 1;
+}
+
+#detail-container {
+    width: 100%;
+    height: 100%;
+}
+
+#detail-title {
+    text-align: center;
+    color: cyan;
+    text-style: bold;
+    height: auto;
+}
+
+#detail-status {
+    text-align: center;
+    height: auto;
+    margin: 1 0;
+}
+
+#detail-log-scroll {
+    height: 1fr;
+    border: solid white;
+}
+
+#detail-log {
+    height: 100%;
+    width: 100%;
+}
+
+#detail-help {
+    text-align: center;
+    color: yellow;
+    text-style: bold;
+    height: auto;
+    margin: 1 0;
+}
+
 /* Tab buttons */
 .tab-button {
     width: auto;
