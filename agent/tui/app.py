@@ -34,8 +34,6 @@ class AgentTUI(App[None]):
 
     def __init__(self) -> None:
         super().__init__()
-        # Disable default Textual focus navigation
-        self.can_focus = False
         self.state_watcher = StateWatcher()
         self.navigation = NavigationManager(self, on_focus_change=self._on_focus_change)
         self.control_panel = ControlPanel()
@@ -74,6 +72,30 @@ class AgentTUI(App[None]):
     # ------------------------------------------------------------------
     # Input & navigation handling
     # ------------------------------------------------------------------
+
+    async def on_key(self, event: events.Key) -> None:
+        """Handle all key presses."""
+        if event.key == "up":
+            event.prevent_default()
+            event.stop()
+            self.show_status("Up pressed")
+            self.navigation.focus_previous()
+        elif event.key == "down":
+            event.prevent_default()
+            event.stop()
+            self.show_status("Down pressed")
+            self.navigation.focus_next()
+        elif event.key == "enter":
+            event.prevent_default()
+            event.stop()
+            self.show_status("Enter pressed")
+            self.navigation.activate_focused()
+        elif event.key == "escape":
+            event.prevent_default()
+            event.stop()
+            self.show_status("Escape pressed")
+            self.stop_agent()
+            self.exit()
 
     def action_focus_next(self) -> None:
         """Move to next focusable element."""
