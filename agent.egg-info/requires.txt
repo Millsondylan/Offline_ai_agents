@@ -1,0 +1,12 @@
+textual
+watchdog
+requests
+keyring
+
+[dev]
+ruff
+bandit
+semgrep
+pip-audit
+pytest
+coverage

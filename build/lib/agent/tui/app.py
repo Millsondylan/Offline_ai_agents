@@ -25,9 +25,6 @@ class AgentTUI(App[None]):
 
     CSS_PATH = Path(__file__).with_name("styles.css")
 
-    # Ensure app can receive keyboard events
-    can_focus = True
-
     BINDINGS = [
         Binding("up", "focus_previous", "Previous", priority=True),
         Binding("down", "focus_next", "Next", priority=True),
@@ -67,8 +64,10 @@ class AgentTUI(App[None]):
         await self.poll_state()
         self.set_interval(0.5, self.poll_state)
         self.rebuild_navigation()
-        # Focus the app so it receives keyboard events
-        self.set_focus(None)
+        # Disable focus on child widgets but keep app focusable
+        for widget in self.query("*"):
+            if hasattr(widget, "can_focus") and widget is not self:
+                widget.can_focus = False
 
     # ------------------------------------------------------------------
     # Input & navigation handling
@@ -76,25 +75,20 @@ class AgentTUI(App[None]):
 
     async def on_key(self, event: events.Key) -> None:
         """Handle all key presses."""
-        # Debug: show what we have
-        entry_count = len(self.navigation.entries)
-        current = self.navigation.current_index
-        focused = self.navigation.get_focused()
-
         if event.key == "up":
             event.prevent_default()
             event.stop()
-            self.show_status(f"Up ({current}/{entry_count}): {focused.widget_id if focused else 'none'}")
+            self.show_status("Up pressed")
             self.navigation.focus_previous()
         elif event.key == "down":
             event.prevent_default()
             event.stop()
-            self.show_status(f"Down ({current}/{entry_count}): {focused.widget_id if focused else 'none'}")
+            self.show_status("Down pressed")
             self.navigation.focus_next()
         elif event.key == "enter":
             event.prevent_default()
             event.stop()
-            self.show_status(f"Enter on: {focused.widget_id if focused else 'none'}")
+            self.show_status("Enter pressed")
             self.navigation.activate_focused()
         elif event.key == "escape":
             event.prevent_default()
