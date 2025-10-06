@@ -257,17 +257,13 @@ NavigationItem.focused {
     text-style: bold;
 }
 
-/* Scrollbars */
-::-webkit-scrollbar {
-    width: 1;
+/* Scrollbars - using Textual scrollbar styling */
+Vertical > ScrollableContainer {
+    scrollbar-size: 1 1;
 }
 
-::-webkit-scrollbar-thumb {
-    background: $primary;
-}
-
-::-webkit-scrollbar-track {
-    background: $surface;
+Horizontal > ScrollableContainer {
+    scrollbar-size: 1 1;
 }
 
 /* Log viewer */
