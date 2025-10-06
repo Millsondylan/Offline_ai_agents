@@ -34,6 +34,8 @@ class AgentTUI(App[None]):
 
     def __init__(self) -> None:
         super().__init__()
+        # Disable default Textual focus navigation
+        self.can_focus = False
         self.state_watcher = StateWatcher()
         self.navigation = NavigationManager(self, on_focus_change=self._on_focus_change)
         self.control_panel = ControlPanel()
@@ -64,6 +66,10 @@ class AgentTUI(App[None]):
         await self.poll_state()
         self.set_interval(0.5, self.poll_state)
         self.rebuild_navigation()
+        # Disable focus on all widgets to prevent them from capturing keys
+        for widget in self.query("*"):
+            if hasattr(widget, "can_focus"):
+                widget.can_focus = False
 
     # ------------------------------------------------------------------
     # Input & navigation handling
