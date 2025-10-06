@@ -38,6 +38,14 @@ class StartButton(NavigationItem):
         getattr(self.app, "start_agent", lambda: None)()
 
 
+class GiveTaskButton(NavigationItem):
+    def __init__(self) -> None:
+        super().__init__("Give Task - Provide a specific task for the agent", "Give task", id="control-give-task")
+
+    def handle_enter(self) -> None:  # type: ignore[override]
+        getattr(self.app, "open_task_input", lambda: None)()
+
+
 class StopButton(NavigationItem):
     def __init__(self) -> None:
         super().__init__("Stop - Terminate agent completely", "Stop agent", id="control-stop")
@@ -134,6 +142,7 @@ class ControlPanel(Static):
         self.status_label = Label("● IDLE", id="status-label")
         self.provider_label = Label("Provider: --", id="provider-label")
         self.session_label = Label("Session: 0s | Cycle: --", id="session-label")
+        self.give_task_button = GiveTaskButton()
         self.start_button = StartButton()
         self.pause_button = PauseResumeButton()
         self.stop_button = StopButton()
@@ -152,20 +161,19 @@ class ControlPanel(Static):
             self.status_label,
             self.provider_label,
             self.session_label,
-            Label("\n─── Agent Control ───", classes="separator"),
+            Label("\n"),
+            self.give_task_button,
             self.start_button,
             self.pause_button,
             self.stop_button,
-            Label("\n─── Advanced Features ───", classes="separator"),
+            self.model_button,
+            self.commit_button,
+            self.logs_button,
             self.task_manager_button,
             self.thinking_button,
             self.view_code_button,
             self.model_config_button,
             self.verification_button,
-            Label("\n─── Actions ───", classes="separator"),
-            self.model_button,
-            self.commit_button,
-            self.logs_button,
             id="control-panel-body",
         )
 

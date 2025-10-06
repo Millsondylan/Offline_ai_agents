@@ -1,0 +1,14 @@
+{
+  "models": {
+    "preferred": "gpt-4",
+    "temperature": 0.7,
+    "max_tokens": 2048,
+    "top_p": 0.95
+  },
+  "paths": {
+    "tasks": "~/.agent_cli/tasks.json",
+    "logs": "~/.agent_cli/logs",
+    "model_config": "~/.agent_cli/model_config.json",
+    "test_results": "~/.agent_cli/test_results.json"
+  }
+}

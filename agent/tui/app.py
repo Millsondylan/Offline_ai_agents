@@ -26,6 +26,7 @@ from .widgets.model_selector import ModelSelector
 from .widgets.verification_config import VerificationConfig
 from .widgets.task_manager import TaskManager
 from .widgets.code_viewer import CodeViewer, FileSelector
+from .widgets.task_input import TaskInputDialog
 
 
 class AgentTUI(App[None]):
@@ -60,6 +61,7 @@ class AgentTUI(App[None]):
         self.task_manager = TaskManager()
         self.code_viewer = CodeViewer()
         self.file_selector = FileSelector()
+        self.task_input = TaskInputDialog()
         self._status_timer = None
         self._in_detail_mode = False
         self._in_code_view = False
@@ -94,12 +96,14 @@ class AgentTUI(App[None]):
         self.detail_view.display = False
         self.code_viewer.display = False
         self.file_selector.display = False
+        self.task_input.display = False
 
         yield Vertical(
             self.menu_container,
             self.detail_view,
             self.code_viewer,
             self.file_selector,
+            self.task_input,
             self.status_bar,
             id="layout-root",
         )
@@ -269,6 +273,8 @@ class AgentTUI(App[None]):
             self.code_viewer.display = False
         if hasattr(self, 'file_selector'):
             self.file_selector.display = False
+        if hasattr(self, 'task_input'):
+            self.task_input.display = False
         self.show_status("Returned to menu")
 
     def show_detail(self, action_name: str, status: str = "Working...") -> None:
@@ -690,6 +696,54 @@ class AgentTUI(App[None]):
         self.menu_container.display = False
         self.detail_view.display = False
         self.file_selector.display = True
+
+    def open_task_input(self) -> None:
+        """Open the task input dialog."""
+        self._in_detail_mode = True
+        self.menu_container.display = False
+        self.detail_view.display = False
+        self.task_input.display = True
+
+    def start_agent_with_task(self, task_description: str, scope: str = "", max_cycles: int = 10) -> bool:
+        """Start the agent with a specific task.
+
+        Args:
+            task_description: The task for the agent to work on
+            scope: Optional scope restriction (e.g., "auth/")
+            max_cycles: Maximum number of agent cycles
+
+        Returns:
+            True if agent started successfully
+        """
+        try:
+            # Write task to file that agent can read
+            task_file = self.control_root / "task.txt"
+            task_file.parent.mkdir(parents=True, exist_ok=True)
+            task_file.write_text(task_description, encoding="utf-8")
+
+            # Update config with max_cycles
+            try:
+                with open(self.config_path, "r") as f:
+                    config = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                config = {}
+
+            config["max_cycles"] = max_cycles
+            self.save_config(config)
+
+            # Start session with scope if provided
+            if scope:
+                session_cmd = f"start scope={scope}"
+                self._write_control("session", session_cmd)
+
+            # Start the agent (this would normally be done by running agent/run.py in background)
+            # For now, just create a start.cmd file
+            self._write_control("start")
+
+            return True
+        except Exception as e:
+            self.show_status(f"Error starting agent: {e}", duration=5.0)
+            return False
 
 
 def launch_app() -> int:

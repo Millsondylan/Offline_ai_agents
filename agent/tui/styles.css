@@ -389,3 +389,28 @@ Log {
     text-align: center;
     width: 100%;
 }
+
+/* Control panel columns */
+#control-columns {
+    width: 100%;
+    height: auto;
+    layout: horizontal;
+}
+
+.control-column {
+    width: 50%;
+    height: auto;
+    padding: 0 1;
+}
+
+.control-number {
+    color: yellow;
+    text-style: bold;
+    height: 1;
+    margin: 0;
+}
+
+.dim-text {
+    color: $text-muted;
+    text-style: italic;
+}

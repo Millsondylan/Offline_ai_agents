@@ -592,11 +592,29 @@ def compose_prompt(
     if scope_hint:
         sections.append(f"[scope_hint]\nLimit changes to: {scope_hint}\n")
 
+    # Check for user-provided task
+    task_file = LOCAL_ROOT / "control" / "task.txt"
+    user_task = None
+    if task_file.exists():
+        try:
+            user_task = task_file.read_text(encoding="utf-8").strip()
+        except Exception:
+            pass
+
     sections.append("Task:\n")
+    if user_task:
+        sections.append(f"USER TASK (PRIORITY): {user_task}\n\n")
+        sections.append(
+            "Complete the user's task above. Review ALL context (git status, test results, linter output, prior commands)"
+            " and propose the safest patch that accomplishes the task.\n\n"
+        )
+    else:
+        sections.append(
+            "You are an offline-first autonomous engineer operating on this repository."
+            " Review ALL context above (git status, test results, linter output, prior commands, session scope)"
+            " and propose the safest patch that progresses the current goals.\n\n"
+        )
     sections.append(
-        "You are an offline-first autonomous engineer operating on this repository."
-        " Review ALL context above (git status, test results, linter output, prior commands, session scope)"
-        " and propose the safest patch that progresses the current goals.\n\n"
         "Guidelines:\n"
         "- Keep changes minimal, compilable, and focused on the scope\n"
         "- Address any failing tests or linter errors shown above\n"
