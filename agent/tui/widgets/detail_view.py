@@ -12,7 +12,10 @@ class DetailView(Static):
         super().__init__(id="detail-view")
         self.title = Label("", id="detail-title")
         self.status = Label("", id="detail-status")
-        self.log = RichLog(id="detail-log", wrap=True, highlight=True, markup=True)
+        self.log = RichLog(id="detail-log")
+        self.log.wrap = True
+        self.log.highlight = True
+        self.log.markup = True
         self.help_text = Label("Press ESC or 'q' to return to menu", id="detail-help")
 
     def compose(self):
