@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] - 2025-10-06
+
+### Fixed
+- **Critical**: Focus is now HIGHLY visible in TUI
+  - Heavy yellow border with blue background and white text
+  - Bold + reverse video styling (impossible to miss)
+  - Fixed timing issues with focus application during mount
+  - Status bar shows current position: `[1/95] widget-id → action`
+
+### Added
+- **Auto-load test data**: TUI now generates 60 tasks, 20 gates, 40+ artifacts on first launch
+  - Ensures there's always content to navigate
+  - No more empty panels
+  - Helpful status messages guide first-time users
+
+### Changed
+- Improved error handling in navigation system
+  - Defensive checks for app.is_mounted before widget manipulation
+  - Silently skip focus errors during initialization
+  - Safe scrolling with try/except blocks
+- Better status bar updates during navigation
+- All NavigationItem widgets now have visible borders
+
 ## [0.3.1] - 2025-10-06
 
 ### Fixed
