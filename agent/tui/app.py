@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from textual import events
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 
 from .navigation import NavEntry, NavigationHint, NavigationManager
@@ -25,10 +26,10 @@ class AgentTUI(App[None]):
     CSS_PATH = Path(__file__).with_name("styles.css")
 
     BINDINGS = [
-        ("up", "focus_previous", "Previous"),
-        ("down", "focus_next", "Next"),
-        ("enter", "activate", "Activate"),
-        ("escape", "quit_app", "Exit"),
+        Binding("up", "focus_previous", "Previous", priority=True),
+        Binding("down", "focus_next", "Next", priority=True),
+        Binding("enter", "activate", "Activate", priority=True),
+        Binding("escape", "quit_app", "Exit", priority=True),
     ]
 
     def __init__(self) -> None:
@@ -70,18 +71,22 @@ class AgentTUI(App[None]):
 
     def action_focus_next(self) -> None:
         """Move to next focusable element."""
+        self.show_status("Down pressed")
         self.navigation.focus_next()
 
     def action_focus_previous(self) -> None:
         """Move to previous focusable element."""
+        self.show_status("Up pressed")
         self.navigation.focus_previous()
 
     def action_activate(self) -> None:
         """Activate currently focused element."""
+        self.show_status("Enter pressed")
         self.navigation.activate_focused()
 
     def action_quit_app(self) -> None:
         """Stop agent and exit."""
+        self.show_status("Escape pressed")
         self.stop_agent()
         self.exit()
 
