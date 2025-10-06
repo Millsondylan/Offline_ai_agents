@@ -465,15 +465,98 @@ class AgentTUI(App[None]):
     def open_thinking_log(self) -> None:
         """Open the model thinking log viewer."""
         self.show_detail("Model Thinking Log")
-        self.detail_view.add_log("[bold cyan]AI Model Reasoning Process[/bold cyan]")
+        self.detail_view.add_log("[bold cyan]═══ AI MODEL REASONING PROCESS ═══[/bold cyan]")
         self.detail_view.add_log("")
-        self.detail_view.add_log("This view shows the model's thinking process including:")
-        self.detail_view.add_log("• Planning and strategy decisions")
-        self.detail_view.add_log("• Code analysis and reasoning")
-        self.detail_view.add_log("• Verification check results")
-        self.detail_view.add_log("• Model responses and interactions")
-        self.detail_view.add_log("")
-        self.detail_view.add_log("[dim]The thinking log updates in real-time during task execution.[/dim]")
+
+        # Get recent thinking events from state
+        snapshot = self.state_watcher.snapshot()
+        thinking_events = snapshot.output.thinking_events
+
+        if not thinking_events:
+            self.detail_view.add_log("[dim]No thinking events yet. The agent will log its reasoning here when it runs.[/dim]")
+            self.detail_view.add_log("")
+            self.detail_view.add_log("[bold]What you'll see here:[/bold]")
+            self.detail_view.add_log("• 📋 Planning - Strategic decisions and task breakdown")
+            self.detail_view.add_log("• 🤔 Reasoning - Analysis and decision logic")
+            self.detail_view.add_log("• ⚡ Decisions - Key choices being made")
+            self.detail_view.add_log("• 🔨 Actions - Operations being performed")
+            self.detail_view.add_log("• 🔍 Analysis - Code and data examination")
+            self.detail_view.add_log("• ✅ Verification - Quality check results")
+            self.detail_view.add_log("• 🤖 Model Interactions - AI prompts and responses")
+            return
+
+        # Display events in chronological order
+        icons = {
+            "thinking": "💭",
+            "action": "🔨",
+            "analysis": "🔍",
+            "decision": "⚡",
+            "verification": "✅",
+            "model_interaction": "🤖",
+            "strategy": "🎯",
+            "reflection": "💭",
+            "error": "❌",
+            "cycle_start": "🔄",
+            "code_generation": "📝",
+        }
+
+        for event in thinking_events[-50:]:  # Show last 50 events
+            icon = icons.get(event.event_type, "•")
+            event_type = event.event_type.replace("_", " ").title()
+
+            # Format timestamp
+            from datetime import datetime
+            ts = datetime.fromtimestamp(event.timestamp).strftime("%H:%M:%S")
+
+            # Cycle info
+            cycle_str = f"[Cycle {event.cycle}]" if event.cycle else ""
+
+            self.detail_view.add_log(f"[dim]{ts}[/dim] {icon} [bold cyan]{event_type}[/bold cyan] {cycle_str}")
+
+            # Display event data based on type
+            data = event.data
+            if event.event_type == "thinking":
+                thought_type = data.get("type", "")
+                content = data.get("content", "")
+                self.detail_view.add_log(f"  {content}")
+                if data.get("metadata"):
+                    for key, value in data["metadata"].items():
+                        self.detail_view.add_log(f"    [dim]• {key}: {value}[/dim]")
+            elif event.event_type == "action":
+                action = data.get("action", "")
+                details = data.get("details", "")
+                status = data.get("status", "")
+                self.detail_view.add_log(f"  [bold]{action}[/bold]: {details} [{status}]")
+            elif event.event_type == "verification":
+                check = data.get("check", "")
+                passed = data.get("passed", False)
+                message = data.get("message", "")
+                result = "[green]✓ PASSED[/green]" if passed else "[red]✗ FAILED[/red]"
+                self.detail_view.add_log(f"  {check}: {result}")
+                if message:
+                    self.detail_view.add_log(f"    {message}")
+            elif event.event_type == "model_interaction":
+                prompt = data.get("prompt_summary", "")
+                response = data.get("response_summary", "")
+                self.detail_view.add_log(f"  [dim]→[/dim] {prompt}")
+                self.detail_view.add_log(f"  [dim]←[/dim] {response}")
+            elif event.event_type == "code_generation":
+                file_path = data.get("file_path", "")
+                operation = data.get("operation", "")
+                lines = data.get("lines_changed", 0)
+                self.detail_view.add_log(f"  {operation.upper()}: {file_path} ({lines} lines)")
+            elif event.event_type == "error":
+                error_type = data.get("error_type", "")
+                message = data.get("message", "")
+                self.detail_view.add_log(f"  [bold red]{error_type}[/bold red]: {message}")
+            else:
+                # Generic data display
+                if "message" in data:
+                    self.detail_view.add_log(f"  {data['message']}")
+                elif "content" in data:
+                    self.detail_view.add_log(f"  {data['content']}")
+
+            self.detail_view.add_log("")  # Blank line between events
 
     def open_model_config(self) -> None:
         """Open model configuration interface."""

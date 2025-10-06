@@ -24,6 +24,7 @@ from .analyzers import (
 from .analyzers.base import AnalyzerResult, Finding
 from .patcher import apply_patch_with_git, extract_unified_diff
 from .providers import KeyStore, Provider, ProviderError, provider_from_config
+from .thinking_logger import ThinkingLogger
 from .utils import collect_artifacts, ensure_dir, now_ts, read_text, run_cmd, write_text
 
 try:  # Optional watchdog support
@@ -724,12 +725,23 @@ class AgentLoop:
         ensure_dir(str(LOCAL_ROOT / 'control'))
         ensure_dir(str(STATE_ROOT))
 
+        # Initialize thinking logger
+        self.thinking_logger = ThinkingLogger(STATE_ROOT)
+
     def run(self) -> None:
         cycle = 1
         try:
             while True:
                 if self.max_cycles and cycle > self.max_cycles:
+                    self.thinking_logger.log_thinking("completion", f"Reached max cycles ({self.max_cycles})")
                     break
+
+                # Start new cycle
+                self.thinking_logger.start_cycle(cycle)
+                self.thinking_logger.log_thinking("planning", f"Beginning cycle {cycle}", {
+                    "max_cycles": self.max_cycles,
+                    "cooldown": self.cooldown
+                })
 
                 process_control_commands(self.commit_state, self.session_state)
                 cfg_snapshot = load_config(ARTIFACT_ROOT.parent / 'config.json')
@@ -737,9 +749,11 @@ class AgentLoop:
                 desired_model = cfg_snapshot.get('provider', {}).get('model')
                 if desired_model and hasattr(self.provider, 'set_model'):
                     try:
+                        self.thinking_logger.log_action("switch_model", f"Switching to model: {desired_model}", "started")
                         self.provider.set_model(desired_model)
-                    except Exception:
-                        pass
+                        self.thinking_logger.log_action("switch_model", f"Model switched to: {desired_model}", "completed")
+                    except Exception as e:
+                        self.thinking_logger.log_error("model_switch", f"Failed to switch model: {e}")
                 cycle_dir = ARTIFACT_ROOT / f"cycle_{cycle:03d}_{now_ts()}"
                 ensure_dir(str(cycle_dir))
 
@@ -748,13 +762,25 @@ class AgentLoop:
                 write_text(str(cycle_dir / "session.meta.json"), json.dumps(self.session_state.to_meta(), indent=2))
 
                 fast_paths = self.fast_path.drain()
+                if fast_paths:
+                    self.thinking_logger.log_thinking("analysis", f"Detected {len(fast_paths)} changed files", {
+                        "files": [str(p) for p in fast_paths[:5]]  # Log first 5
+                    })
                 fast_summary = run_fast_checks(self.repo_root, fast_paths, cycle_dir) if fast_paths else {}
 
+                self.thinking_logger.log_thinking("planning", "Running analysis commands")
                 command_results: Dict[str, Dict[str, Any]] = {}
                 for name in ["analyze", "test", "e2e", "screenshots"]:
+                    self.thinking_logger.log_action(f"run_{name}", f"Executing {name} command", "started")
                     command_results[name] = run_custom_command(name, self.cfg, cycle_dir)
+                    status = "completed" if command_results[name].get("code") == 0 else "failed"
+                    self.thinking_logger.log_action(f"run_{name}", f"{name} command finished", status)
 
                 scope_hint = self.session_state.active_scope
+                if scope_hint:
+                    self.thinking_logger.log_thinking("strategy", f"Limiting scope to: {scope_hint}")
+
+                self.thinking_logger.log_thinking("planning", "Composing prompt for model")
                 prompt = compose_prompt(
                     self.repo_root,
                     cycle_dir,
@@ -765,23 +791,52 @@ class AgentLoop:
                     fast_paths,
                 )
 
+                self.thinking_logger.log_model_interaction(
+                    f"Prompt composed ({len(prompt)} chars)",
+                    "Awaiting model response...",
+                    len(prompt) // 4,  # Rough token estimate
+                    None
+                )
+
                 try:
+                    self.thinking_logger.log_action("generate_patch", "Requesting patch from model", "started")
                     raw = self.provider.generate_patch(prompt, str(cycle_dir))
+                    self.thinking_logger.log_action("generate_patch", "Received model response", "completed")
+                    if raw:
+                        self.thinking_logger.log_model_interaction(
+                            f"Prompt sent ({len(prompt)} chars)",
+                            f"Response received ({len(raw)} chars)",
+                            len(prompt) // 4,
+                            len(raw) // 4
+                        )
                 except ProviderError as exc:
+                    self.thinking_logger.log_error("provider", f"Provider error: {exc}")
                     write_text(str(cycle_dir / "provider.error.txt"), str(exc))
                     raw = None
 
                 patch_text = extract_unified_diff(raw) if raw else None
                 if raw and not patch_text:
+                    self.thinking_logger.log_thinking("analysis", "Model response did not contain a valid diff patch")
                     write_text(str(cycle_dir / "provider_output_no_patch.txt"), raw)
+                elif patch_text:
+                    self.thinking_logger.log_thinking("decision", f"Extracted patch with changes", {
+                        "patch_size": len(patch_text)
+                    })
 
                 proposed_files = parse_files_from_diff(patch_text)
+                if proposed_files:
+                    self.thinking_logger.log_code_generation(
+                        ", ".join(proposed_files[:3]) + ("..." if len(proposed_files) > 3 else ""),
+                        "modify" if patch_text else "none",
+                        len(patch_text.splitlines()) if patch_text else 0
+                    )
 
                 applied = False
                 gate_report: Optional[GateReport] = None
                 commit_meta: Dict[str, Any] = {}
                 if self.apply_patches and patch_text:
                     if self.require_approval:
+                        self.thinking_logger.log_thinking("decision", "Awaiting manual approval before applying patch")
                         approve_path = cycle_dir / "approve.txt"
                         if read_text(str(approve_path)) is None:
                             write_text(str(approve_path), "Put 'ok' to apply this cycle's patch\n")
@@ -789,16 +844,32 @@ class AgentLoop:
                     else:
                         approved = True
                     if approved:
+                        self.thinking_logger.log_action("apply_patch", f"Applying patch to {len(proposed_files)} files", "started")
                         apply_out = apply_patch_with_git(str(self.repo_root), patch_text, str(cycle_dir), path_prefix=self.path_prefix)
                         write_text(str(cycle_dir / "apply_patch.log"), apply_out)
                         write_text(str(cycle_dir / "applied.patch"), patch_text)
                         applied = True
+                        self.thinking_logger.log_action("apply_patch", "Patch applied successfully", "completed")
+
+                        self.thinking_logger.log_thinking("verification", "Running production quality gates")
                         gate_report = run_production_gate(self.repo_root, self.cfg, cycle_dir, proposed_files)
+
+                        # Log gate results
+                        if gate_report:
+                            for analyzer_name, result in gate_report.results.items():
+                                self.thinking_logger.log_verification(
+                                    analyzer_name,
+                                    result.ok,
+                                    result.summary
+                                )
+
                         commit_meta = self._maybe_commit(gate_report, proposed_files, patch_text, cycle_dir)
                     else:
+                        self.thinking_logger.log_thinking("decision", "Patch not approved, skipping application")
                         write_text(str(cycle_dir / "apply_patch.log"), "SKIPPED (awaiting approval)")
                 else:
                     if patch_text:
+                        self.thinking_logger.log_thinking("decision", "Patch generation disabled in config")
                         write_text(str(cycle_dir / "apply_patch.log"), "SKIPPED (apply_patches disabled)")
 
                 # Session post-review gate even without new patch

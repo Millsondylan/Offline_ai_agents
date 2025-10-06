@@ -88,12 +88,22 @@ class ArtifactState:
 
 
 @dataclass
+class ThinkingEvent:
+    """A thinking/reasoning event."""
+    timestamp: float
+    cycle: Optional[int]
+    event_type: str
+    data: Dict
+
+
+@dataclass
 class OutputState:
     """Output viewer state."""
     diff_text: str = ""
     findings: List[Dict] = field(default_factory=list)
     logs: List[str] = field(default_factory=list)
     config_text: str = ""
+    thinking_events: List[ThinkingEvent] = field(default_factory=list)
 
 
 @dataclass
@@ -294,12 +304,42 @@ class StateWatcher:
             except Exception:
                 pass
 
+        # Read thinking events
+        thinking_events = self._read_thinking_events()
+
         return OutputState(
             diff_text=diff_text,
             findings=findings,
             logs=logs,
             config_text=config_text,
+            thinking_events=thinking_events,
         )
+
+    def _read_thinking_events(self, limit: int = 100) -> List[ThinkingEvent]:
+        """Read recent thinking events."""
+        thinking_file = self.state_root / "thinking.jsonl"
+        if not thinking_file.exists():
+            return []
+
+        events = []
+        try:
+            with open(thinking_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        event_data = json.loads(line.strip())
+                        events.append(ThinkingEvent(
+                            timestamp=event_data.get("timestamp", 0),
+                            cycle=event_data.get("cycle"),
+                            event_type=event_data.get("event_type", "unknown"),
+                            data=event_data.get("data", {})
+                        ))
+                    except json.JSONDecodeError:
+                        continue
+        except Exception:
+            return []
+
+        # Return most recent events
+        return events[-limit:]
 
     def _get_latest_cycle_dir(self) -> Optional[Path]:
         """Get the latest cycle directory."""
