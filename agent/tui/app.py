@@ -64,9 +64,9 @@ class AgentTUI(App[None]):
         await self.poll_state()
         self.set_interval(0.5, self.poll_state)
         self.rebuild_navigation()
-        # Disable focus on all widgets to prevent them from capturing keys
+        # Disable focus on child widgets but keep app focusable
         for widget in self.query("*"):
-            if hasattr(widget, "can_focus"):
+            if hasattr(widget, "can_focus") and widget is not self:
                 widget.can_focus = False
 
     # ------------------------------------------------------------------
