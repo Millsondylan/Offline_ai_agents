@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 
 from agent_dashboard.dashboard import Dashboard
+from agent_dashboard.core.model_downloader import ModelDownloader
 
 
 # Setup logging
@@ -37,6 +38,24 @@ def main_curses(stdscr):
 def main():
     """Entry point."""
     try:
+        # Ensure model is available before starting dashboard
+        print("=== Agent Dashboard Startup ===")
+        print("Checking for available models...")
+
+        model = ModelDownloader.ensure_model_available()
+        if model:
+            ModelDownloader.configure_agent_for_ollama(model)
+            print(f"\n✓ Ready to start with model: {model}")
+            print("\nStarting dashboard...")
+            input("Press Enter to continue...")
+        else:
+            print("\n⚠ No model available. You can:")
+            print("1. Install Ollama: brew install ollama")
+            print("2. Download a model: ollama pull deepseek-coder:33b")
+            print("3. Set API keys: export ANTHROPIC_API_KEY=...")
+            print("\nContinuing anyway (configure model in dashboard)...")
+            input("Press Enter to continue...")
+
         curses.wrapper(main_curses)
     except KeyboardInterrupt:
         print("\nExiting...")

@@ -4,7 +4,7 @@ import curses
 import time
 from typing import Optional
 
-from agent_dashboard.core.agent_manager import AgentManager
+from agent_dashboard.core.real_agent_manager import RealAgentManager
 from agent_dashboard.core.theme import ThemeManager
 from agent_dashboard.core.models import AgentStatus
 
@@ -35,7 +35,7 @@ class Dashboard:
 
     def __init__(self, stdscr):
         self.stdscr = stdscr
-        self.agent_manager = AgentManager()
+        self.agent_manager = RealAgentManager()
         self.theme_manager = ThemeManager()
 
         # Initialize panels

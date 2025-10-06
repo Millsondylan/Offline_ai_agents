@@ -18,9 +18,17 @@ class TaskPanel(BasePanel):
         y = start_y + 1
         x = start_x + 2
 
+        # Instructions
+        self.safe_addstr(win, y, x, "Task Manager - AI Prompts for Autonomous Execution",
+                       self.theme_manager.get('highlight'))
+        y += 1
+        self.safe_addstr(win, y, x, "Add tasks (N) - AI will work on them continuously",
+                       self.theme_manager.get('info'))
+        y += 2
+
         if not tasks:
-            self.safe_addstr(win, y, x, "No tasks yet. Press N to create.",
-                           self.theme_manager.get('info'))
+            self.safe_addstr(win, y, x, "No tasks yet. Press N to add your first AI prompt.",
+                           self.theme_manager.get('warning'))
             return
 
         # Header
