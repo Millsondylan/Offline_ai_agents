@@ -70,11 +70,11 @@ class ArtifactBrowser(Static):
             depth = max(0, len(parts) - 2)
             indent = "  " * depth
             name = parts[-1] if parts else artifact.path.name
-            label = f"{indent}📄 {name}"
+            label = f"{indent}📄 {name} - Open file in viewer (press ENTER)"
             button = ArtifactButton(artifact, label, counter)
             self.container.mount(button)
             widget_id = button.id or f"artifact-{counter}"
-            self._nav_entries.append(NavEntry(widget_id=widget_id, action="View artifact"))
+            self._nav_entries.append(NavEntry(widget_id=widget_id, action=f"View artifact: {name}"))
             counter += 1
         self.refresh()
 

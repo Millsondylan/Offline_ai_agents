@@ -40,7 +40,7 @@ class TaskButton(NavigationItem):
 
 class NewTaskButton(NavigationItem):
     def __init__(self, queue: "TaskQueue") -> None:
-        super().__init__("[+ New Task]", "Add new task", id="task-new")
+        super().__init__("+ New Task - Add a new task to the queue", "Add new task", id="task-new")
         self.queue = queue
 
     def handle_enter(self) -> None:  # type: ignore[override]
@@ -131,10 +131,23 @@ class TaskQueue(Static):
 
         for index, task in enumerate(tasks):
             icon = _STATUS_ICON.get(task.status.lower(), "□")
-            label = f"{icon} {task.title}"
+            status_desc = {
+                "running": "Currently executing",
+                "in_progress": "Currently executing",
+                "active": "Currently executing",
+                "paused": "Paused",
+                "pending": "Waiting to run",
+                "queued": "Waiting to run",
+                "waiting": "Waiting to run",
+                "complete": "Completed",
+                "completed": "Completed",
+                "done": "Completed",
+                "failed": "Failed"
+            }.get(task.status.lower(), task.status)
+            label = f"{icon} {task.title} - {status_desc} (press ENTER to toggle)"
             button = TaskButton(task.identifier, label, task.status, index)
             self.tasks_container.mount(button)
-            self._nav_entries.append(NavEntry(widget_id=button.id or f"task-{index}", action=button.enter_action))
+            self._nav_entries.append(NavEntry(widget_id=button.id or f"task-{index}", action=f"Toggle task: {task.title}"))
         self.refresh()
 
     def nav_entries(self) -> List[NavEntry]:

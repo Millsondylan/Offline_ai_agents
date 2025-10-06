@@ -78,7 +78,13 @@ class GateStatusPanel(Static):
 
         for index, gate in enumerate(gates):
             icon = _GATE_ICONS.get(gate.status.lower(), "⏳")
-            label = f"{icon} {gate.name}"
+            status_desc = {
+                "passed": "All checks passed",
+                "failed": "Has failures",
+                "running": "Currently checking",
+                "pending": "Not yet run"
+            }.get(gate.status.lower(), gate.status)
+            label = f"{icon} {gate.name} - {status_desc} (press ENTER to view findings)"
             button = GateButton(gate.name, label, gate.status, index)
             button.enter_action = f"View {gate.name} findings"
             self.gates_container.mount(button)
