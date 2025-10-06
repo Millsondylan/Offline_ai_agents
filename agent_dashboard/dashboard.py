@@ -13,22 +13,24 @@ from agent_dashboard.panels.tasks import TaskPanel
 from agent_dashboard.panels.thinking import ThinkingPanel
 from agent_dashboard.panels.logs import LogsPanel
 from agent_dashboard.panels.help import HelpPanel
+from agent_dashboard.panels.code_viewer import CodeViewerPanel
+from agent_dashboard.panels.model_config import ModelConfigPanel
 
 
 class Dashboard:
     """Main dashboard UI controller."""
 
     MENU_ITEMS = [
-        "1. Task Manager",
-        "2. Start/Pause",
-        "3. Stop Agent",
-        "4. AI Thinking",
-        "5. Logs",
-        "6. Code Editor",
-        "7. Model Config",
-        "8. Verification",
-        "9. Help",
-        "0. Exit",
+        "T. Task Manager",
+        "S. Start/Pause",
+        "X. Stop Agent",
+        "A. AI Thinking",
+        "L. Logs",
+        "C. Code Viewer",
+        "M. Model Config",
+        "V. Verification",
+        "H. Help",
+        "Q. Exit",
     ]
 
     def __init__(self, stdscr):
@@ -43,6 +45,8 @@ class Dashboard:
             'thinking': ThinkingPanel(self.agent_manager, self.theme_manager),
             'logs': LogsPanel(self.agent_manager, self.theme_manager),
             'help': HelpPanel(self.agent_manager, self.theme_manager),
+            'code': CodeViewerPanel(self.agent_manager, self.theme_manager),
+            'model': ModelConfigPanel(self.agent_manager, self.theme_manager),
         }
 
         self.current_panel = 'home'
@@ -228,7 +232,7 @@ class Dashboard:
                           self.theme_manager.get('info'))
 
         # Hints
-        hints = "1-9 = Select | ↑/↓ = Navigate | Enter = Select | ESC = Back | T = Theme | 0 = Quit"
+        hints = "T/S/A/L/C/M/H = Menu | ↑/↓ = Navigate | Enter = Select | ESC = Back | F1 = Theme | Q = Quit"
         hint_y = height - 1
         self.stdscr.addstr(hint_y, 1, f"Hint: {hints[:width-8]}",
                           self.theme_manager.get('info'))
@@ -236,11 +240,11 @@ class Dashboard:
     def handle_key(self, key: int):
         """Handle keyboard input."""
         # Global shortcuts
-        if key in (ord('0'), ord('q'), ord('Q')):
+        if key in (ord('q'), ord('Q')):
             self.running = False
             return
 
-        elif key in (ord('t'), ord('T'), curses.KEY_F1):
+        elif key == curses.KEY_F1:  # F1 for theme toggle
             self.theme_manager.toggle()
             return
 
@@ -250,28 +254,36 @@ class Dashboard:
                 self.current_panel = 'home'
             return
 
-        # Menu shortcuts
-        elif key == ord('1'):
+        # Menu shortcuts (letter-based)
+        elif key in (ord('t'), ord('T')):
             self.switch_panel('tasks', "Task Manager")
             return
 
-        elif key == ord('2'):
+        elif key in (ord('s'), ord('S')):
             self.handle_start_pause()
             return
 
-        elif key == ord('3'):
+        elif key in (ord('x'), ord('X')):
             self.agent_manager.stop()
             return
 
-        elif key == ord('4'):
+        elif key in (ord('a'), ord('A')):
             self.switch_panel('thinking', "AI Thinking")
             return
 
-        elif key == ord('5'):
+        elif key in (ord('l'), ord('L')):
             self.switch_panel('logs', "Logs")
             return
 
-        elif key == ord('9'):
+        elif key in (ord('c'), ord('C')):
+            self.switch_panel('code', "Code Viewer")
+            return
+
+        elif key in (ord('m'), ord('M')):
+            self.switch_panel('model', "Model Config")
+            return
+
+        elif key in (ord('h'), ord('H')):
             self.switch_panel('help', "Help")
             return
 
