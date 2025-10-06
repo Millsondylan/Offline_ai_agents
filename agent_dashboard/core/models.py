@@ -53,6 +53,7 @@ class AgentState:
     memory_mb: int = 0
     errors: int = 0
     warnings: int = 0
+    verification_checks: list = field(default_factory=list)
 
 
 @dataclass

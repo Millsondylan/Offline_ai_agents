@@ -1,17 +1,31 @@
 """Real agent manager that integrates with agent/run.py."""
 
+print("Importing threading")
 import threading
+print("Importing time")
 import time
+print("Importing datetime")
 from datetime import datetime
+print("Importing deque")
 from collections import deque
+print("Importing Path")
 from pathlib import Path
+print("Importing typing")
 from typing import Optional, List
+print("Importing json")
 import json
+import sys
 
+print("Importing TaskExecutor")
+from agent.task_executor import TaskExecutor
+print("Imported TaskExecutor")
+
+print("Importing models")
 from agent_dashboard.core.models import (
     AgentState, AgentStatus, AgentMode, Task, TaskStatus,
     ThoughtEntry, LogEntry, LogLevel
 )
+print("Imported models")
 
 
 class RealAgentManager:
@@ -35,6 +49,8 @@ class RealAgentManager:
         self.control_dir = self.local_root / "control"
         self.task_file = self.control_dir / "task.txt"
         self.state_root = Path(__file__).resolve().parent.parent.parent / "agent" / "state"
+
+        self.task_executor = TaskExecutor(self.repo_root)
 
         # Ensure directories exist
         self.control_dir.mkdir(parents=True, exist_ok=True)
@@ -60,11 +76,12 @@ class RealAgentManager:
             self._start_time = time.time()
             self._stop_flag = False
 
-            # Start agent thread
-            self._agent_thread = threading.Thread(target=self._run_real_agent, daemon=True)
-            self._agent_thread.start()
+        # Start agent thread
+        # self._agent_thread = threading.Thread(target=self._run_real_agent, daemon=True)
+        # self._agent_thread.start()
+        self._run_real_agent()
 
-            self._add_log(LogLevel.INFO, "Real agent started - autonomous mode")
+        self._add_log(LogLevel.INFO, "Real agent started - autonomous mode")
 
     def pause(self):
         """Pause the agent (not supported for autonomous agent)."""
@@ -82,7 +99,14 @@ class RealAgentManager:
             self._add_log(LogLevel.WARN, "Stop requested but agent is designed to run continuously")
             # In truly autonomous mode, we don't stop
             # But we can mark it for user awareness
-            self._add_log(LogLevel.INFO, "Agent continues running (design: never stop)")
+            self._add_log(LogLevel.INFO, f"Agent continues running (design: never stop)")
+
+    def run_verification(self):
+        """Run the verification suite."""
+        with self._lock:
+            self._add_log(LogLevel.INFO, "Verification run requested")
+            task_id = self.task_executor.create_task("Manual Verification", "Running verification suite manually")
+            self.task_executor.execute_task(task_id, lambda: True)
 
     def add_task(self, description: str) -> Task:
         """Add a new task to the queue."""
@@ -134,6 +158,23 @@ class RealAgentManager:
         with self._lock:
             if self._start_time and self.state.status == AgentStatus.RUNNING:
                 self.state.elapsed_seconds = int(time.time() - self._start_time)
+            
+            # Get state from task executor
+            executor_state = self.task_executor.get_state()
+            self.state.verification_checks = executor_state["verification_checks"]
+            
+            # Find active task and update state
+            active_task = None
+            for task in executor_state["tasks"]:
+                if task["status"] == "running" or task["status"] == "verifying":
+                    active_task = task
+                    break
+            
+            if active_task:
+                self.state.current_task = active_task["task_name"]
+                self.state.progress_percent = int(active_task["progress"])
+                self.state.cycle = active_task.get("cycle", 0)
+
             return self.state
 
     def get_thoughts(self) -> List[ThoughtEntry]:
@@ -147,73 +188,22 @@ class RealAgentManager:
             return list(self.logs)
 
     def _run_real_agent(self):
-        """Run the real agent loop - imports and executes agent/run.py."""
+        """Run the real agent loop using TaskExecutor."""
         try:
-            # Import the real agent
-            from agent.run import AgentLoop, load_config
-
-            # Load config
-            config_path = self.repo_root / "agent" / "config.json"
-            cfg = load_config(config_path)
-
-            # Override config for autonomous mode
-            cfg.setdefault('loop', {})
-            cfg['loop']['max_cycles'] = 0  # Never stop
-            cfg['loop']['cooldown_seconds'] = 10  # Faster cycles
-            cfg['loop']['apply_patches'] = True  # Auto-apply changes
-            cfg['loop']['require_manual_approval'] = False  # No human intervention
-
             with self._lock:
-                self._add_log(LogLevel.INFO, "Starting AgentLoop from agent/run.py")
-                self.state.model = cfg.get('provider', {}).get('model', 'unknown')
+                self._add_log(LogLevel.INFO, "Starting TaskExecutor from agent/task_executor.py")
 
-            # Create and run agent loop
-            agent_loop = AgentLoop(self.repo_root, cfg)
-
-            # Monitor agent in separate thread
-            monitor_thread = threading.Thread(target=self._monitor_agent, args=(agent_loop,), daemon=True)
-            monitor_thread.start()
-
-            # Run agent (blocks until stopped)
-            agent_loop.run()
+            # The TaskExecutor will run in its own thread and manage its own state.
+            # We just need to start it.
+            # We will need a way to get the state from it.
+            # For now, we will just run it.
+            # This is not ideal, but it's a step in the right direction.
+            self.task_executor.run_continuously()
 
         except Exception as e:
             with self._lock:
                 self._add_log(LogLevel.ERROR, f"Agent error: {str(e)}")
                 self.state.status = AgentStatus.STOPPED
-
-    def _monitor_agent(self, agent_loop):
-        """Monitor agent execution and update dashboard state."""
-        while not self._stop_flag and self.state.status == AgentStatus.RUNNING:
-            try:
-                # Read thinking logs
-                thinking_log = self.state_root / "thinking.log"
-                if thinking_log.exists():
-                    # Parse recent thinking logs
-                    with open(thinking_log, 'r', encoding='utf-8') as f:
-                        lines = f.readlines()
-                        for line in lines[-10:]:  # Last 10 lines
-                            if line.strip():
-                                with self._lock:
-                                    thought = ThoughtEntry(
-                                        cycle=self.state.cycle,
-                                        timestamp=datetime.now(),
-                                        content=line.strip()[:200]
-                                    )
-                                    self.thoughts.append(thought)
-
-                # Update cycle count from artifacts
-                artifact_root = Path(__file__).resolve().parent.parent.parent / "agent" / "artifacts"
-                if artifact_root.exists():
-                    cycle_dirs = list(artifact_root.glob("cycle_*"))
-                    with self._lock:
-                        self.state.cycle = len(cycle_dirs)
-
-                time.sleep(5)  # Check every 5 seconds
-
-            except Exception as e:
-                with self._lock:
-                    self._add_log(LogLevel.ERROR, f"Monitor error: {e}")
 
     def _load_model_from_config(self):
         """Load model name from config file."""

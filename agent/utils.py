@@ -11,6 +11,7 @@ def now_ts() -> str:
 
 
 def run_cmd(cmd: str, timeout: int = 600) -> Tuple[int, str]:
+    print(f"Running command: {cmd}")
     try:
         proc = subprocess.run(
             cmd,

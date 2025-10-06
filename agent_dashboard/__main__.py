@@ -46,16 +46,14 @@ def main():
         if model:
             ModelDownloader.configure_agent_for_ollama(model)
             print(f"\n✓ Ready to start with model: {model}")
-            print("\nStarting dashboard...")
-            input("Press Enter to continue...")
         else:
             print("\n⚠ No model available. You can:")
             print("1. Install Ollama: brew install ollama")
             print("2. Download a model: ollama pull deepseek-coder:33b")
             print("3. Set API keys: export ANTHROPIC_API_KEY=...")
             print("\nContinuing anyway (configure model in dashboard)...")
-            input("Press Enter to continue...")
 
+        print("\nStarting dashboard...")
         curses.wrapper(main_curses)
     except KeyboardInterrupt:
         print("\nExiting...")

@@ -15,6 +15,7 @@ from agent_dashboard.panels.logs import LogsPanel
 from agent_dashboard.panels.help import HelpPanel
 from agent_dashboard.panels.code_viewer import CodeViewerPanel
 from agent_dashboard.panels.model_config import ModelConfigPanel
+from agent_dashboard.panels.verification import VerificationPanel
 
 
 class Dashboard:
@@ -47,17 +48,23 @@ class Dashboard:
             'help': HelpPanel(self.agent_manager, self.theme_manager),
             'code': CodeViewerPanel(self.agent_manager, self.theme_manager),
             'model': ModelConfigPanel(self.agent_manager, self.theme_manager),
+            'verification': VerificationPanel(self.agent_manager, self.theme_manager, self),
+            'verification_details': None, # Placeholder
         }
 
         self.current_panel = 'home'
         self.breadcrumbs = ["Home"]
         self.running = True
+        self.selected_menu_item = 0
 
         # Setup curses
         curses.curs_set(0)
         self.stdscr.nodelay(True)
         self.stdscr.timeout(100)
         self.theme_manager.initialize()
+
+        # Start the agent
+        self.agent_manager.start()
 
     def run(self):
         """Main event loop."""
@@ -162,8 +169,8 @@ class Dashboard:
             if y >= start_y + height:
                 break
 
-            # Highlight current section
-            attr = self.theme_manager.get('selected') if self._is_current_menu(i) else curses.A_NORMAL
+            # Highlight current selection
+            attr = self.theme_manager.get('selected') if i == self.selected_menu_item else curses.A_NORMAL
 
             self.stdscr.addstr(y, x, item[:width-2], attr)
             y += 1
@@ -283,6 +290,10 @@ class Dashboard:
             self.switch_panel('model', "Model Config")
             return
 
+        elif key in (ord('v'), ord('V')):
+            self.switch_panel('verification', "Verification")
+            return
+
         elif key in (ord('h'), ord('H')):
             self.switch_panel('help', "Help")
             return
@@ -291,10 +302,17 @@ class Dashboard:
             self.handle_start_pause()
             return
 
-        # Delegate to active panel
-        panel = self.panels.get(self.current_panel)
-        if panel:
-            panel.handle_key(key)
+        elif key == curses.KEY_UP:
+            self.selected_menu_item = (self.selected_menu_item - 1) % len(self.MENU_ITEMS)
+            return
+
+        elif key == curses.KEY_DOWN:
+            self.selected_menu_item = (self.selected_menu_item + 1) % len(self.MENU_ITEMS)
+            return;
+
+        elif key in [curses.KEY_ENTER, 10, 13]:
+            self.activate_menu_item()
+            return
 
     def handle_start_pause(self):
         """Handle start/pause toggle."""
@@ -306,6 +324,29 @@ class Dashboard:
             self.agent_manager.pause()
         elif state.status == AgentStatus.PAUSED:
             self.agent_manager.resume()
+
+    def activate_menu_item(self):
+        """Activate the selected menu item."""
+        if self.selected_menu_item == 0:
+            self.switch_panel('tasks', "Task Manager")
+        elif self.selected_menu_item == 1:
+            self.handle_start_pause()
+        elif self.selected_menu_item == 2:
+            self.agent_manager.stop()
+        elif self.selected_menu_item == 3:
+            self.switch_panel('thinking', "AI Thinking")
+        elif self.selected_menu_item == 4:
+            self.switch_panel('logs', "Logs")
+        elif self.selected_menu_item == 5:
+            self.switch_panel('code', "Code Viewer")
+        elif self.selected_menu_item == 6:
+            self.switch_panel('model', "Model Config")
+        elif self.selected_menu_item == 7:
+            self.switch_panel('verification', "Verification")
+        elif self.selected_menu_item == 8:
+            self.switch_panel('help', "Help")
+        elif self.selected_menu_item == 9:
+            self.running = False
 
     def switch_panel(self, panel_name: str, display_name: str):
         """Switch to a different panel."""
