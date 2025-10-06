@@ -56,6 +56,7 @@ class NavigationManager:
         self.entries = entries
         if self.current_index >= len(entries):
             self.current_index = 0
+        self._apply_focus()
 
     def focus_next(self) -> None:
         """Move focus to next element (wraps to top)."""
@@ -84,8 +85,10 @@ class NavigationManager:
             return
 
         widget = self.app.query_one(f"#{entry.widget_id}")
-        if hasattr(widget, "on_activate"):
-            widget.on_activate()
+        if hasattr(widget, "handle_enter"):
+            widget.handle_enter()
+        elif hasattr(widget, "press"):
+            widget.press()
 
     def _apply_focus(self) -> None:
         """Apply focus styling to current element."""
