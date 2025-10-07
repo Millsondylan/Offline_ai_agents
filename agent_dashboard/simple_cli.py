@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""Simple CLI interface for the agent when curses doesn't work."""
+
+import time
+import threading
+from agent_dashboard.core.real_agent_manager import RealAgentManager
+from agent_dashboard.core.models import AgentStatus
+
+class SimpleCLI:
+    """Simple command-line interface for agent control."""
+
+    def __init__(self):
+        self.agent_manager = RealAgentManager()
+        self.running = True
+
+    def print_status(self):
+        """Print current agent status."""
+        state = self.agent_manager.get_state()
+        print(f"\n--- Agent Status ---")
+        print(f"Status: {state.status.value}")
+        print(f"Model: {state.model}")
+        print(f"Session: {state.session_id}")
+        print(f"Cycle: {state.cycle}")
+        print(f"Current Task: {state.current_task or 'None'}")
+        print(f"Elapsed: {state.elapsed_seconds}s")
+        print(f"Errors: {state.errors}, Warnings: {state.warnings}")
+
+    def print_menu(self):
+        """Print available commands."""
+        print(f"\n--- Agent Dashboard (Simple CLI) ---")
+        print("Commands:")
+        print("  s/start  - Start agent")
+        print("  p/pause  - Pause agent")
+        print("  x/stop   - Stop agent")
+        print("  t/task   - Add new task")
+        print("  l/logs   - Show recent logs")
+        print("  status   - Show agent status")
+        print("  q/quit   - Exit dashboard")
+        print("  h/help   - Show this menu")
+
+    def show_logs(self):
+        """Show recent log entries."""
+        logs = self.agent_manager.get_logs()
+        print(f"\n--- Recent Logs (last 10) ---")
+        for log in logs[-10:]:
+            timestamp = log.timestamp.strftime("%H:%M:%S")
+            print(f"[{timestamp}] {log.level.name}: {log.message}")
+
+    def add_task(self):
+        """Add a new task."""
+        print("\nEnter task description:")
+        description = input("> ").strip()
+        if description:
+            task = self.agent_manager.add_task(description)
+            print(f"✓ Added task #{task.id}: {task.description}")
+        else:
+            print("Task description cannot be empty.")
+
+    def run(self):
+        """Run the simple CLI interface."""
+        print("=== Agent Dashboard (Simple CLI Mode) ===")
+        print("Curses interface not available, using simple text interface.")
+
+        self.print_status()
+        self.print_menu()
+
+        while self.running:
+            try:
+                command = input("\nCommand> ").strip().lower()
+
+                if command in ['q', 'quit', 'exit']:
+                    self.running = False
+                    print("Exiting dashboard...")
+
+                elif command in ['s', 'start']:
+                    self.agent_manager.start()
+                    print("✓ Agent started")
+
+                elif command in ['p', 'pause']:
+                    self.agent_manager.pause()
+                    print("✓ Agent pause requested")
+
+                elif command in ['x', 'stop']:
+                    self.agent_manager.stop()
+                    print("✓ Agent stop requested")
+
+                elif command in ['t', 'task']:
+                    self.add_task()
+
+                elif command in ['l', 'logs']:
+                    self.show_logs()
+
+                elif command == 'status':
+                    self.print_status()
+
+                elif command in ['h', 'help']:
+                    self.print_menu()
+
+                elif command == '':
+                    # Empty command, just refresh status
+                    self.print_status()
+
+                else:
+                    print(f"Unknown command: {command}")
+                    print("Type 'h' for help or 'q' to quit")
+
+            except KeyboardInterrupt:
+                print("\nCtrl+C pressed. Type 'q' to quit.")
+            except EOFError:
+                print("\nEOF detected. Exiting...")
+                self.running = False
+
+def main():
+    """Entry point for simple CLI."""
+    cli = SimpleCLI()
+    cli.run()
+
+if __name__ == "__main__":
+    main()

@@ -54,7 +54,14 @@ def main():
             print("\nContinuing anyway (configure model in dashboard)...")
 
         print("\nStarting dashboard...")
-        curses.wrapper(main_curses)
+        try:
+            curses.wrapper(main_curses)
+        except curses.error as e:
+            print(f"\nCurses interface failed: {e}")
+            print("Falling back to simple CLI interface...")
+            from agent_dashboard.simple_cli import SimpleCLI
+            cli = SimpleCLI()
+            cli.run()
     except KeyboardInterrupt:
         print("\nExiting...")
     except Exception as e:

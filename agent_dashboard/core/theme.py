@@ -19,16 +19,21 @@ class ThemeManager:
 
     def initialize(self):
         """Initialize curses colors."""
-        if not curses.has_colors():
-            return
+        try:
+            if not curses.has_colors():
+                self._init_fallback_colors()
+                return
 
-        curses.start_color()
-        curses.use_default_colors()
+            curses.start_color()
+            curses.use_default_colors()
 
-        if self.current_theme == Theme.DARK:
-            self._init_dark_theme()
-        else:
-            self._init_light_theme()
+            if self.current_theme == Theme.DARK:
+                self._init_dark_theme()
+            else:
+                self._init_light_theme()
+        except curses.error:
+            # Fallback if curses is not properly initialized
+            self._init_fallback_colors()
 
     def _init_dark_theme(self):
         """Initialize dark theme colors."""
@@ -72,6 +77,19 @@ class ThemeManager:
             'info': curses.color_pair(6),
             'selected': curses.color_pair(7),
             'highlight': curses.color_pair(8),
+        }
+
+    def _init_fallback_colors(self):
+        """Initialize fallback colors when curses is not available."""
+        self.color_pairs = {
+            'normal': 0,
+            'header': 0,
+            'running': 0,
+            'error': 0,
+            'warning': 0,
+            'info': 0,
+            'selected': 0,
+            'highlight': 0,
         }
 
     def toggle(self):

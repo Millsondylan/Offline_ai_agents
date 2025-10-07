@@ -386,7 +386,12 @@ class TaskExecutor:
     def _save_task(self, task: TaskExecution) -> None:
         """Save task state to disk."""
         task_file = self.state_root / f"{task.task_id}.json"
-        self._save_task(task)
+        try:
+            with open(task_file, "w") as f:
+                json.dump(task.to_dict(), f, indent=2)
+        except Exception as e:
+            # Don't crash on save failures
+            pass
 
     def run_continuously(self):
         """Run the task executor in a continuous loop."""

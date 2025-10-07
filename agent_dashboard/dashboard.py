@@ -58,9 +58,10 @@ class Dashboard:
         self.selected_menu_item = 0
 
         # Setup curses
-        curses.curs_set(0)
+        curses.curs_set(0)  # Hide cursor
         self.stdscr.nodelay(True)
         self.stdscr.timeout(100)
+        self.stdscr.keypad(True)  # Enable special keys
         self.theme_manager.initialize()
 
         # Don't auto-start - let user press S to start
@@ -308,7 +309,7 @@ class Dashboard:
 
         elif key == curses.KEY_DOWN:
             self.selected_menu_item = (self.selected_menu_item + 1) % len(self.MENU_ITEMS)
-            return;
+            return
 
         elif key in [curses.KEY_ENTER, 10, 13]:
             self.activate_menu_item()
