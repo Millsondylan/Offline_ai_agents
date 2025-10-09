@@ -172,53 +172,81 @@ class RealAgentManager:
     def _update_state_from_artifacts(self):
         """Update state by reading real agent's artifacts and state files."""
         try:
-            # Read latest cycle from artifacts directory
+            # First, read from thinking.jsonl for real-time status
+            thinking_file = self.repo_root / "agent" / "state" / "thinking.jsonl"
+            if thinking_file.exists():
+                try:
+                    import json
+                    # Read the last few lines to get latest status
+                    with open(thinking_file, 'r', encoding='utf-8') as f:
+                        lines = f.readlines()
+
+                    # Find the latest cycle and current activity
+                    latest_cycle = 0
+                    latest_activity = None
+
+                    for line in reversed(lines[-20:]):  # Check last 20 entries
+                        try:
+                            event = json.loads(line.strip())
+                            cycle = event.get('cycle', 0)
+                            if cycle > latest_cycle:
+                                latest_cycle = cycle
+
+                            # Get current activity
+                            event_type = event.get('event_type')
+                            data = event.get('data', {})
+
+                            if event_type == 'thinking':
+                                content = data.get('content', '')
+                                if content and not latest_activity:
+                                    latest_activity = f"Thinking: {content}"
+                            elif event_type == 'action':
+                                action = data.get('action', '')
+                                details = data.get('details', '')
+                                status = data.get('status', '')
+                                if action and not latest_activity:
+                                    if status == 'started':
+                                        latest_activity = f"Running: {action}"
+                                    elif status == 'completed':
+                                        latest_activity = f"Completed: {action}"
+                                    else:
+                                        latest_activity = f"Action: {action}"
+
+                        except (json.JSONDecodeError, KeyError):
+                            continue
+
+                    if latest_cycle > 0:
+                        self.state.cycle = latest_cycle
+                        self.state.progress_percent = min(50 + (latest_cycle * 10), 90)
+
+                    if latest_activity:
+                        self.state.current_task = latest_activity
+
+                except Exception:
+                    pass
+
+            # Fallback: Read latest cycle from artifacts directory
             artifacts_dir = self.repo_root / "agent" / "artifacts"
             if artifacts_dir.exists():
                 cycle_dirs = [d for d in artifacts_dir.iterdir() if d.is_dir() and d.name.startswith("cycle_")]
                 if cycle_dirs:
                     latest_cycle = max(cycle_dirs, key=lambda d: d.name)
                     cycle_num = int(latest_cycle.name.split("_")[1])
-                    self.state.cycle = cycle_num
+                    if cycle_num > self.state.cycle:  # Only update if higher than thinking log
+                        self.state.cycle = cycle_num
 
-                    # Check cycle metadata for current task
-                    cycle_meta_file = latest_cycle / "cycle.meta.json"
-                    if cycle_meta_file.exists():
-                        try:
-                            import json
-                            with open(cycle_meta_file, 'r') as f:
-                                cycle_meta = json.load(f)
-                                if cycle_meta.get("patch_present"):
-                                    self.state.current_task = "Generating and applying patches"
-                                    self.state.progress_percent = 75 if cycle_meta.get("applied") else 50
-                                else:
-                                    self.state.current_task = "Analyzing repository state"
-                                    self.state.progress_percent = 25
-                        except Exception:
-                            pass
-
-            # Read session state
-            session_file = self.repo_root / "agent" / "state" / "session.json"
-            if session_file.exists():
-                try:
-                    import json
-                    with open(session_file, 'r') as f:
-                        session_data = json.load(f)
-                        if session_data.get("active_scope"):
-                            self.state.current_task = f"Working on: {session_data['active_scope']}"
-                except Exception:
-                    pass
-
-            # Read task from control file
-            task_file = self.repo_root / "agent" / "local" / "control" / "task.txt"
-            if task_file.exists():
-                try:
-                    task_content = task_file.read_text(encoding="utf-8").strip()
-                    if task_content:
-                        self.state.current_task = f"User task: {task_content[:50]}..."
-                        self.state.progress_percent = 10  # Just started
-                except Exception:
-                    pass
+            # Read task from control file if no current task found
+            if not self.state.current_task or self.state.current_task == "None":
+                task_file = self.repo_root / "agent" / "local" / "control" / "task.txt"
+                if task_file.exists():
+                    try:
+                        task_content = task_file.read_text(encoding="utf-8").strip()
+                        if task_content:
+                            self.state.current_task = f"User task: {task_content[:50]}..."
+                            if self.state.cycle == 0:
+                                self.state.progress_percent = 5  # Task loaded but not started
+                    except Exception:
+                        pass
         except Exception:
             # Don't crash on state reading errors
             pass

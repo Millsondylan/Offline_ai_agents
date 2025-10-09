@@ -1,1 +1,1 @@
-Create test.py with a simple function
+Create a simple math_operations.py file
