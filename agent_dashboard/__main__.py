@@ -57,8 +57,8 @@ def main():
         try:
             curses.wrapper(main_curses)
         except curses.error as e:
-            print(f"\nCurses interface failed: {e}")
-            print("Falling back to simple CLI interface...")
+            print(f"\nCurses interface failed: {e}", file=sys.stderr)
+            print("Falling back to simple CLI interface...", file=sys.stderr)
             from agent_dashboard.simple_cli import SimpleCLI
             cli = SimpleCLI()
             cli.run()

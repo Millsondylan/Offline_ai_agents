@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional, List
 import json
 
-from agent.task_executor import TaskExecutor
+# TaskExecutor no longer needed - using real agent loop directly
 from agent_dashboard.core.models import (
     AgentState, AgentStatus, AgentMode, Task, TaskStatus,
     ThoughtEntry, LogEntry, LogLevel
@@ -37,7 +37,8 @@ class RealAgentManager:
         self.task_file = self.control_dir / "task.txt"
         self.state_root = Path(__file__).resolve().parent.parent.parent / "agent" / "state"
 
-        self.task_executor = TaskExecutor(self.repo_root)
+        # Note: We no longer use TaskExecutor for running the agent
+        # The real agent loop is started directly in _run_real_agent
 
         # Ensure directories exist
         self.control_dir.mkdir(parents=True, exist_ok=True)
@@ -83,17 +84,32 @@ class RealAgentManager:
     def stop(self):
         """Stop the agent."""
         with self._lock:
-            self._add_log(LogLevel.WARN, "Stop requested but agent is designed to run continuously")
-            # In truly autonomous mode, we don't stop
-            # But we can mark it for user awareness
-            self._add_log(LogLevel.INFO, f"Agent continues running (design: never stop)")
+            if self.state.status != AgentStatus.RUNNING:
+                return
+
+            self._add_log(LogLevel.INFO, "Stopping agent...")
+            self._stop_flag = True
+
+            # Signal the real agent to stop by creating a control command
+            try:
+                stop_cmd_file = self.control_dir / "stop.cmd"
+                stop_cmd_file.write_text("stop\n", encoding="utf-8")
+                self._add_log(LogLevel.INFO, "Stop signal sent to agent")
+            except Exception as e:
+                self._add_log(LogLevel.ERROR, f"Failed to send stop signal: {e}")
+
+            # Wait for the agent thread to finish
+            if self._agent_thread and self._agent_thread.is_alive():
+                self._agent_thread.join(timeout=10)  # Give it more time to finish cycle
+
+            self.state.status = AgentStatus.STOPPED
+            self._agent_thread = None
+            self._add_log(LogLevel.INFO, "Agent stopped.")
 
     def run_verification(self):
         """Run the verification suite."""
         with self._lock:
-            self._add_log(LogLevel.INFO, "Verification run requested")
-            task_id = self.task_executor.create_task("Manual Verification", "Running verification suite manually")
-            self.task_executor.execute_task(task_id, lambda: True)
+            self._add_log(LogLevel.INFO, "Verification run requested - will be handled by real agent cycle")
 
     def add_task(self, description: str) -> Task:
         """Add a new task to the queue."""
@@ -107,10 +123,12 @@ class RealAgentManager:
             )
             self.tasks.append(task)
 
-            # Write task to control file for agent to pick up
+            # Write task to control file for real agent to pick up
             try:
-                with open(self.task_file, 'a', encoding='utf-8') as f:
-                    f.write(f"\n[Task #{task_id}] {description}\n")
+                # The real agent reads from agent/local/control/task.txt
+                # Overwrite the file with the new task (agent processes one task at a time)
+                with open(self.task_file, 'w', encoding='utf-8') as f:
+                    f.write(f"{description}\n")
                 self._add_log(LogLevel.INFO, f"Task #{task_id} queued: {description[:50]}...")
             except Exception as e:
                 self._add_log(LogLevel.ERROR, f"Failed to write task: {e}")
@@ -145,29 +163,146 @@ class RealAgentManager:
         with self._lock:
             if self._start_time and self.state.status == AgentStatus.RUNNING:
                 self.state.elapsed_seconds = int(time.time() - self._start_time)
-            
-            # Get state from task executor
-            executor_state = self.task_executor.get_state()
-            self.state.verification_checks = executor_state["verification_checks"]
-            
-            # Find active task and update state
-            active_task = None
-            for task in executor_state["tasks"]:
-                if task["status"] == "running" or task["status"] == "verifying":
-                    active_task = task
-                    break
-            
-            if active_task:
-                self.state.current_task = active_task["task_name"]
-                self.state.progress_percent = int(active_task["progress"])
-                self.state.cycle = active_task.get("cycle", 0)
+
+            # Read state from real agent artifacts and state files
+            self._update_state_from_artifacts()
 
             return self.state
 
+    def _update_state_from_artifacts(self):
+        """Update state by reading real agent's artifacts and state files."""
+        try:
+            # Read latest cycle from artifacts directory
+            artifacts_dir = self.repo_root / "agent" / "artifacts"
+            if artifacts_dir.exists():
+                cycle_dirs = [d for d in artifacts_dir.iterdir() if d.is_dir() and d.name.startswith("cycle_")]
+                if cycle_dirs:
+                    latest_cycle = max(cycle_dirs, key=lambda d: d.name)
+                    cycle_num = int(latest_cycle.name.split("_")[1])
+                    self.state.cycle = cycle_num
+
+                    # Check cycle metadata for current task
+                    cycle_meta_file = latest_cycle / "cycle.meta.json"
+                    if cycle_meta_file.exists():
+                        try:
+                            import json
+                            with open(cycle_meta_file, 'r') as f:
+                                cycle_meta = json.load(f)
+                                if cycle_meta.get("patch_present"):
+                                    self.state.current_task = "Generating and applying patches"
+                                    self.state.progress_percent = 75 if cycle_meta.get("applied") else 50
+                                else:
+                                    self.state.current_task = "Analyzing repository state"
+                                    self.state.progress_percent = 25
+                        except Exception:
+                            pass
+
+            # Read session state
+            session_file = self.repo_root / "agent" / "state" / "session.json"
+            if session_file.exists():
+                try:
+                    import json
+                    with open(session_file, 'r') as f:
+                        session_data = json.load(f)
+                        if session_data.get("active_scope"):
+                            self.state.current_task = f"Working on: {session_data['active_scope']}"
+                except Exception:
+                    pass
+
+            # Read task from control file
+            task_file = self.repo_root / "agent" / "local" / "control" / "task.txt"
+            if task_file.exists():
+                try:
+                    task_content = task_file.read_text(encoding="utf-8").strip()
+                    if task_content:
+                        self.state.current_task = f"User task: {task_content[:50]}..."
+                        self.state.progress_percent = 10  # Just started
+                except Exception:
+                    pass
+        except Exception:
+            # Don't crash on state reading errors
+            pass
+
     def get_thoughts(self) -> List[ThoughtEntry]:
-        """Get all thoughts."""
-        with self._lock:
-            return list(self.thoughts)
+        """Get all thoughts from the thinking logger."""
+        thinking_file = self.repo_root / "agent" / "state" / "thinking.jsonl"
+        thoughts = []
+
+        if not thinking_file.exists():
+            return thoughts
+
+        try:
+            import json
+            from datetime import datetime
+
+            with open(thinking_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    try:
+                        event = json.loads(line.strip())
+
+                        # Convert thinking events to ThoughtEntry
+                        if event.get('event_type') in ['thinking', 'action', 'decision', 'verification', 'model_interaction', 'code_generation', 'cycle_start', 'cycle_end']:
+                            content = self._format_thinking_event(event)
+                            if content:
+                                thought = ThoughtEntry(
+                                    cycle=event.get('cycle', 0),
+                                    timestamp=datetime.fromtimestamp(event.get('timestamp', 0)),
+                                    content=content
+                                )
+                                thoughts.append(thought)
+                    except (json.JSONDecodeError, KeyError, ValueError):
+                        continue
+
+        except Exception:
+            # Don't crash if there are file reading issues
+            pass
+
+        # Return most recent thoughts (last 100)
+        return thoughts[-100:]
+
+    def _format_thinking_event(self, event: dict) -> str:
+        """Format a thinking event for display in the dashboard."""
+        event_type = event.get('event_type', 'unknown')
+        data = event.get('data', {})
+
+        if event_type == 'cycle_start':
+            cycle = data.get('cycle', '?')
+            return f"🔄 Starting cycle {cycle}"
+        elif event_type == 'cycle_end':
+            cycle = data.get('cycle', '?')
+            return f"✅ Completed cycle {cycle}"
+        elif event_type == 'thinking':
+            thinking_type = data.get('type', 'general')
+            content = data.get('content', '')
+            return f"🤔 {thinking_type.title()}: {content}"
+        elif event_type == 'action':
+            action = data.get('action', 'unknown')
+            details = data.get('details', '')
+            status = data.get('status', '')
+            status_icon = "✅" if status == "completed" else "⚡" if status == "started" else "❌" if status == "failed" else ""
+            return f"{status_icon} Action: {action} - {details}"
+        elif event_type == 'decision':
+            decision = data.get('decision', 'unknown')
+            details = data.get('details', '')
+            return f"🎯 Decision: {decision} - {details}"
+        elif event_type == 'verification':
+            tool = data.get('tool', 'unknown')
+            result = data.get('result', 'unknown')
+            details = data.get('details', '')
+            return f"🔍 Verification: {tool} -> {result} - {details}"
+        elif event_type == 'model_interaction':
+            model = data.get('model', 'unknown')
+            interaction_type = data.get('interaction_type', 'unknown')
+            details = data.get('details', '')
+            return f"🤖 Model: {model} ({interaction_type}) - {details}"
+        elif event_type == 'code_generation':
+            language = data.get('language', 'unknown')
+            details = data.get('details', '')
+            return f"💻 Code: {language} - {details}"
+        else:
+            # Fallback for any other event types
+            content = data.get('content', data.get('details', data.get('message', str(data))))
+            return f"📝 {event_type}: {content}"
 
     def get_logs(self) -> List[LogEntry]:
         """Get all logs."""
@@ -175,14 +310,22 @@ class RealAgentManager:
             return list(self.logs)
 
     def _run_real_agent(self):
-        """Run the real agent loop using TaskExecutor."""
+        """Run the real agent loop using the actual AgentLoop."""
         try:
             with self._lock:
-                self._add_log(LogLevel.INFO, "Starting TaskExecutor")
+                self._add_log(LogLevel.INFO, "Starting real autonomous agent")
 
-            # Run the task executor's continuous loop
-            # This will block, but it's in a daemon thread so it's OK
-            self.task_executor.run_continuously()
+            # Import and run the real agent loop
+            from agent.run import AgentLoop, load_config
+
+            config_path = self.repo_root / "agent" / "config.json"
+            cfg = load_config(config_path)
+
+            agent_loop = AgentLoop(self.repo_root, cfg)
+
+            # Run the real agent loop
+            # This will run until max_cycles or until the thread is interrupted
+            agent_loop.run()
 
         except Exception as e:
             import traceback

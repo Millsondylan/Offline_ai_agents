@@ -19,8 +19,8 @@
     "gemini-2.0-flash"
   ],
   "loop": {
-    "max_cycles": 0,
-    "cooldown_seconds": 60,
+    "max_cycles": 3,
+    "cooldown_seconds": 10,
     "apply_patches": true,
     "require_manual_approval": false,
     "fast_path_on_fs_change": true

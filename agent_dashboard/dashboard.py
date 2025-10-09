@@ -31,7 +31,7 @@ class Dashboard:
         "M. Model Config",
         "V. Verification",
         "H. Help",
-        "Q. Exit",
+        "CTRL+Q. Exit",
     ]
 
     def __init__(self, stdscr):
@@ -57,11 +57,20 @@ class Dashboard:
         self.running = True
         self.selected_menu_item = 0
 
-        # Setup curses
-        curses.curs_set(0)  # Hide cursor
+        # Setup curses with error handling
+        try:
+            curses.curs_set(0)  # Hide cursor
+        except curses.error:
+            pass  # Cursor hiding not supported in some terminals
+
         self.stdscr.nodelay(True)
         self.stdscr.timeout(100)
-        self.stdscr.keypad(True)  # Enable special keys
+
+        try:
+            self.stdscr.keypad(True)  # Enable special keys
+        except curses.error:
+            pass  # Special keys not supported in some terminals
+
         self.theme_manager.initialize()
 
         # Don't auto-start - let user press S to start
@@ -240,7 +249,7 @@ class Dashboard:
                           self.theme_manager.get('info'))
 
         # Hints
-        hints = "T/S/A/L/C/M/H = Menu | ↑/↓ = Navigate | Enter = Select | ESC = Back | F1 = Theme | Q = Quit"
+        hints = "T/S/A/L/C/M/H = Menu | ↑/↓ = Navigate | Enter = Select | ESC = Back | F1 = Theme | CTRL+Q = Quit"
         hint_y = height - 1
         self.stdscr.addstr(hint_y, 1, f"Hint: {hints[:width-8]}",
                           self.theme_manager.get('info'))
@@ -248,7 +257,7 @@ class Dashboard:
     def handle_key(self, key: int):
         """Handle keyboard input."""
         # Global shortcuts
-        if key in (ord('q'), ord('Q')):
+        if key == 17: # CTRL+Q
             self.running = False
             return
 

@@ -35,6 +35,7 @@ class SimpleCLI:
         print("  t/task   - Add new task")
         print("  n/new    - Add new task (same as t)")
         print("  l/logs   - Show recent logs")
+        print("  th/think - Show AI thinking/reasoning")
         print("  status   - Show agent status")
         print("  q/quit   - Exit dashboard")
         print("  h/help   - Show this menu")
@@ -46,6 +47,19 @@ class SimpleCLI:
         for log in logs[-10:]:
             timestamp = log.timestamp.strftime("%H:%M:%S")
             print(f"[{timestamp}] {log.level.name}: {log.message}")
+
+    def show_thinking(self):
+        """Show AI thinking/reasoning logs."""
+        thoughts = self.agent_manager.get_thoughts()
+        print(f"\n--- AI Thinking & Reasoning (last 20) ---")
+        if not thoughts:
+            print("No thinking logs available yet.")
+            print("Start the agent with 's' to see AI reasoning.")
+        else:
+            for thought in thoughts[-20:]:
+                timestamp = thought.timestamp.strftime("%H:%M:%S")
+                cycle = f"C{thought.cycle}" if thought.cycle > 0 else "C?"
+                print(f"[{timestamp}] {cycle}: {thought.content}")
 
     def add_task(self):
         """Add a new task with custom prompt."""
@@ -101,6 +115,9 @@ class SimpleCLI:
 
                 elif command in ['l', 'logs']:
                     self.show_logs()
+
+                elif command in ['th', 'think', 'thinking']:
+                    self.show_thinking()
 
                 elif command == 'status':
                     self.print_status()

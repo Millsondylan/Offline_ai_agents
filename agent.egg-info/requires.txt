@@ -1,7 +1,3 @@
-textual
-watchdog
-requests
-keyring
 
 [dev]
 ruff

@@ -107,6 +107,7 @@ class TaskExecutor:
         self.state_root = state_root
         self.tasks: Dict[str, TaskExecution] = {}
         self.verification_checks: List[VerificationCheck] = []
+        self._stop_flag = False
         self._setup_default_checks()
         self._bind_check_functions()
 
@@ -393,9 +394,13 @@ class TaskExecutor:
             # Don't crash on save failures
             pass
 
+    def stop(self):
+        """Stop the continuous loop."""
+        self._stop_flag = True
+
     def run_continuously(self):
         """Run the task executor in a continuous loop."""
-        while True:
+        while not self._stop_flag:
             task_id = self.create_task("Autonomous Agent Loop", "Running agent in a continuous loop")
             self.execute_task(task_id, lambda: time.sleep(10) or True)
             time.sleep(10)

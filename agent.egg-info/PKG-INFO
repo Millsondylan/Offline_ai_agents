@@ -1,7 +1,7 @@
 Metadata-Version: 2.1
 Name: agent
-Version: 0.3.0
-Summary: Always-on offline-first coding agent with production gates and TUI
+Version: 1.2.3
+Summary: Modern CLI control panel for autonomous AI agents
 Home-page: https://github.com/Millsondylan/Offline_ai_agents
 Author: Dylan Millson
 License: Apache-2.0
