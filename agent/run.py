@@ -238,9 +238,11 @@ def merge_defaults(cfg: Dict[str, Any]) -> Dict[str, Any]:
     merged.setdefault("tui", {})
     return merged
 
-def load_commit_state(cfg: Dict[str, Any]) -> CommitState:
-    ensure_dir(str(STATE_ROOT))
-    path = STATE_ROOT / "commit_scheduler.json"
+def load_commit_state(cfg: Dict[str, Any], state_root: Path = None) -> CommitState:
+    if state_root is None:
+        state_root = STATE_ROOT
+    ensure_dir(str(state_root))
+    path = state_root / "commit_scheduler.json"
     if path.exists():
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -258,15 +260,19 @@ def load_commit_state(cfg: Dict[str, Any]) -> CommitState:
     )
 
 
-def save_commit_state(state: CommitState) -> None:
-    ensure_dir(str(STATE_ROOT))
-    path = STATE_ROOT / "commit_scheduler.json"
+def save_commit_state(state: CommitState, state_root: Path = None) -> None:
+    if state_root is None:
+        state_root = STATE_ROOT
+    ensure_dir(str(state_root))
+    path = state_root / "commit_scheduler.json"
     path.write_text(json.dumps(state.to_meta(), indent=2), encoding="utf-8")
 
 
-def load_session_state(cfg: Dict[str, Any]) -> SessionState:
-    ensure_dir(str(STATE_ROOT))
-    path = STATE_ROOT / "session.json"
+def load_session_state(cfg: Dict[str, Any], state_root: Path = None) -> SessionState:
+    if state_root is None:
+        state_root = STATE_ROOT
+    ensure_dir(str(state_root))
+    path = state_root / "session.json"
     defaults = SessionState(
         enabled=bool(cfg_get(cfg, "sessions.enabled", True)),
         default_duration=int(cfg_get(cfg, "sessions.default_duration_seconds", 3600)),
@@ -287,9 +293,11 @@ def load_session_state(cfg: Dict[str, Any]) -> SessionState:
     return defaults
 
 
-def save_session_state(state: SessionState) -> None:
-    ensure_dir(str(STATE_ROOT))
-    path = STATE_ROOT / "session.json"
+def save_session_state(state: SessionState, state_root: Path = None) -> None:
+    if state_root is None:
+        state_root = STATE_ROOT
+    ensure_dir(str(state_root))
+    path = state_root / "session.json"
     path.write_text(json.dumps(state.to_meta(), indent=2), encoding="utf-8")
 
 
@@ -593,7 +601,7 @@ def compose_prompt(
         sections.append(f"[scope_hint]\nLimit changes to: {scope_hint}\n")
 
     # Check for user-provided task
-    task_file = LOCAL_ROOT / "control" / "task.txt"
+    task_file = repo_root / "agent" / "local" / "control" / "task.txt"
     user_task = None
     if task_file.exists():
         try:
@@ -660,13 +668,13 @@ def run_fast_checks(repo_root: Path, fast_paths: List[Path], cycle_dir: Path) ->
     write_text(str(cycle_dir / "fast_path.meta.json"), json.dumps(summary, indent=2))
     return summary
 
-def process_control_commands(scheduler: CommitState, session: SessionState) -> None:
-    control_dir = LOCAL_ROOT / "control"
+def process_control_commands(scheduler: CommitState, session: SessionState, repo_root: Path) -> None:
+    control_dir = repo_root / "agent" / "local" / "control"
     if not control_dir.exists():
         return
 
     keystore = KeyStore()
-    config_path = ARTIFACT_ROOT.parent / 'config.json'
+    config_path = repo_root / 'agent' / 'config.json'
 
     def _parse_duration(raw: str) -> Optional[int]:
         raw = raw.strip().lower()
@@ -734,10 +742,16 @@ class AgentLoop:
         self.repo_root = repo_root
         self.cfg = merge_defaults(cfg)
         self.loop_cfg = self.cfg.get("loop", {})
+
+        # Use repo_root-based paths instead of hardcoded package paths
+        self.artifact_root = self.repo_root / "agent" / "artifacts"
+        self.local_root = self.repo_root / "agent" / "local"
+        self.state_root = self.repo_root / "agent" / "state"
+
         provider_cfg = self.cfg.get("provider", {})
         self.provider = provider_from_config(provider_cfg)
-        self.commit_state = load_commit_state(self.cfg)
-        self.session_state = load_session_state(self.cfg)
+        self.commit_state = load_commit_state(self.cfg, self.state_root)
+        self.session_state = load_session_state(self.cfg, self.state_root)
         fast_path_enabled = bool(cfg_get(self.loop_cfg, "fast_path_on_fs_change", True))
         self.fast_path = FastPathMonitor(self.repo_root, fast_path_enabled)
         self.max_cycles = int(os.getenv("AGENT_MAX_CYCLES", cfg_get(self.loop_cfg, "max_cycles", 0)))
@@ -754,13 +768,14 @@ class AgentLoop:
         cadence = int(git_cfg.get("commit_cadence_seconds", self.commit_state.cadence_seconds))
         self.commit_state.cadence_seconds = cadence
         self.last_push_at = 0.0
-        ensure_dir(str(ARTIFACT_ROOT))
-        ensure_dir(str(LOCAL_ROOT))
-        ensure_dir(str(LOCAL_ROOT / 'control'))
-        ensure_dir(str(STATE_ROOT))
+
+        ensure_dir(str(self.artifact_root))
+        ensure_dir(str(self.local_root))
+        ensure_dir(str(self.local_root / 'control'))
+        ensure_dir(str(self.state_root))
 
         # Initialize thinking logger
-        self.thinking_logger = ThinkingLogger(STATE_ROOT)
+        self.thinking_logger = ThinkingLogger(self.state_root)
 
     def run(self) -> None:
         cycle = 1
@@ -777,8 +792,8 @@ class AgentLoop:
                     "cooldown": self.cooldown
                 })
 
-                process_control_commands(self.commit_state, self.session_state)
-                cfg_snapshot = load_config(ARTIFACT_ROOT.parent / 'config.json')
+                process_control_commands(self.commit_state, self.session_state, self.repo_root)
+                cfg_snapshot = load_config(self.repo_root / 'agent' / 'config.json')
                 self.cfg = merge_defaults(cfg_snapshot)
                 desired_model = cfg_snapshot.get('provider', {}).get('model')
                 if desired_model and hasattr(self.provider, 'set_model'):
@@ -788,11 +803,11 @@ class AgentLoop:
                         self.thinking_logger.log_action("switch_model", f"Model switched to: {desired_model}", "completed")
                     except Exception as e:
                         self.thinking_logger.log_error("model_switch", f"Failed to switch model: {e}")
-                cycle_dir = ARTIFACT_ROOT / f"cycle_{cycle:03d}_{now_ts()}"
+                cycle_dir = self.artifact_root / f"cycle_{cycle:03d}_{now_ts()}"
                 ensure_dir(str(cycle_dir))
 
                 self.session_state.tick()
-                save_session_state(self.session_state)
+                save_session_state(self.session_state, self.state_root)
                 write_text(str(cycle_dir / "session.meta.json"), json.dumps(self.session_state.to_meta(), indent=2))
 
                 fast_paths = self.fast_path.drain()
@@ -910,7 +925,7 @@ class AgentLoop:
                 if self.session_state.review_due():
                     gate_report = run_production_gate(self.repo_root, self.cfg, cycle_dir, proposed_files or [])
                     self.session_state.record_review()
-                    save_session_state(self.session_state)
+                    save_session_state(self.session_state, self.state_root)
                     write_text(str(cycle_dir / "session.meta.json"), json.dumps(self.session_state.to_meta(), indent=2))
 
                 meta = {
@@ -925,7 +940,7 @@ class AgentLoop:
                 }
                 write_text(str(cycle_dir / "cycle.meta.json"), json.dumps(meta, indent=2))
 
-                save_commit_state(self.commit_state)
+                save_commit_state(self.commit_state, self.state_root)
                 write_text(str(cycle_dir / "commit_scheduler.meta.json"), json.dumps(self.commit_state.to_meta(), indent=2))
 
                 cycle += 1
