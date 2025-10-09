@@ -33,6 +33,7 @@ class SimpleCLI:
         print("  p/pause  - Pause agent")
         print("  x/stop   - Stop agent")
         print("  t/task   - Add new task")
+        print("  n/new    - Add new task (same as t)")
         print("  l/logs   - Show recent logs")
         print("  status   - Show agent status")
         print("  q/quit   - Exit dashboard")
@@ -47,12 +48,20 @@ class SimpleCLI:
             print(f"[{timestamp}] {log.level.name}: {log.message}")
 
     def add_task(self):
-        """Add a new task."""
-        print("\nEnter task description:")
-        description = input("> ").strip()
+        """Add a new task with custom prompt."""
+        print("\n=== Add New AI Task ===")
+        print("Enter your task/prompt for the AI agent:")
+        print("Examples:")
+        print("  - Create a FastAPI endpoint for user authentication")
+        print("  - Fix the bug in the payment processing module")
+        print("  - Add unit tests for the user service")
+        print("  - Implement a simple calculator with GUI")
+        print("")
+        description = input("Task/Prompt> ").strip()
         if description:
             task = self.agent_manager.add_task(description)
-            print(f"✓ Added task #{task.id}: {task.description}")
+            print(f"✓ Added task #{task.id}: {task.description[:60]}...")
+            print("✓ The agent will work on this when started with 's'")
         else:
             print("Task description cannot be empty.")
 
@@ -85,6 +94,9 @@ class SimpleCLI:
                     print("✓ Agent stop requested")
 
                 elif command in ['t', 'task']:
+                    self.add_task()
+
+                elif command in ['n', 'new']:
                     self.add_task()
 
                 elif command in ['l', 'logs']:

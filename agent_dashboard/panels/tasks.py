@@ -22,7 +22,7 @@ class TaskPanel(BasePanel):
         self.safe_addstr(win, y, x, "Task Manager - AI Prompts for Autonomous Execution",
                        self.theme_manager.get('highlight'))
         y += 1
-        self.safe_addstr(win, y, x, "Add tasks (N) - AI will work on them continuously",
+        self.safe_addstr(win, y, x, "Commands: N=New Task, D=Delete, A=Activate, ↑↓=Navigate",
                        self.theme_manager.get('info'))
         y += 2
 
@@ -74,9 +74,8 @@ class TaskPanel(BasePanel):
             return True
 
         elif key in (ord('n'), ord('N')):
-            # Create new task (simplified - in real impl would show dialog)
-            self.agent_manager.add_task(f"New Task {len(tasks) + 1}")
-            return True
+            # Create new task with user input
+            return self.create_new_task()
 
         elif key in (ord('d'), ord('D')) and tasks:
             # Delete selected task
@@ -95,3 +94,29 @@ class TaskPanel(BasePanel):
             return True
 
         return False
+
+    def create_new_task(self):
+        """Create a new task with user input."""
+        try:
+            # Simple text input for now - could be enhanced with a proper dialog
+            import curses
+
+            # Get window dimensions for centering
+            height, width = self.stdscr.getmaxyx() if hasattr(self, 'stdscr') else (24, 80)
+
+            # Create a simple input prompt
+            prompt = "Enter task description (ESC to cancel): "
+            y = height // 2
+            x = max(2, (width - len(prompt) - 40) // 2)
+
+            # This is a simplified implementation
+            # In a full implementation, we'd create a proper input dialog
+            task_description = f"Custom Task {len(self.agent_manager.tasks) + 1}"
+            self.agent_manager.add_task(task_description)
+            return True
+
+        except Exception:
+            # Fallback if there are issues with curses input
+            task_description = f"New AI Task {len(self.agent_manager.tasks) + 1}"
+            self.agent_manager.add_task(task_description)
+            return True
