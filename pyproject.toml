@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent"
-version = "1.2.4"
+version = "1.2.5"
 description = "Modern CLI control panel for autonomous AI agents"
 readme = "agent_dashboard/README.md"
 authors = [
