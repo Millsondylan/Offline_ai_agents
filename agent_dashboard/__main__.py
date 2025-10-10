@@ -106,9 +106,9 @@ def run_dashboard():
             curses.wrapper(main_curses)
         except curses.error as e:
             print(f"\nCurses interface failed: {e}", file=sys.stderr)
-            print("Falling back to simple CLI interface...", file=sys.stderr)
-            from agent_dashboard.simple_cli import SimpleCLI
-            cli = SimpleCLI()
+            print("Launching enhanced interactive CLI...", file=sys.stderr)
+            from agent_dashboard.enhanced_cli import EnhancedCLI
+            cli = EnhancedCLI()
             cli.run()
     except KeyboardInterrupt:
         print("\nExiting...")
