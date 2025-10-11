@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR=$(cd "$(dirname "$0")"/.. && pwd)
+PID_FILE="$ROOT_DIR/agent/local/_pid.txt"
+if [ ! -f "$PID_FILE" ]; then
+  echo "no pid file found"
+  exit 0
+fi
+PID=$(cat "$PID_FILE")
+if ps -p "$PID" >/dev/null 2>&1; then
+  kill "$PID" || true
+  echo "stopped agent pid=$PID"
+else
+  echo "no running process with pid=$PID"
+fi
+rm -f "$PID_FILE"
+

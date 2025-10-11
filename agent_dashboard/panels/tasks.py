@@ -97,26 +97,82 @@ class TaskPanel(BasePanel):
 
     def create_new_task(self):
         """Create a new task with user input."""
+        win = getattr(self, "stdscr", None)
+
+        def _fallback_input() -> bool:
+            try:
+                description = input("Task description: ").strip()
+            except EOFError:
+                return False
+            if not description:
+                return False
+            self.agent_manager.add_task(description)
+            self.selected_index = len(self.agent_manager.tasks) - 1
+            return True
+
+        if win is None:
+            return _fallback_input()
+
         try:
-            # Simple text input for now - could be enhanced with a proper dialog
-            import curses
+            curses.curs_set(1)
+        except curses.error:
+            return _fallback_input()
 
-            # Get window dimensions for centering
-            height, width = self.stdscr.getmaxyx() if hasattr(self, 'stdscr') else (24, 80)
-
-            # Create a simple input prompt
+        try:
+            height, width = win.getmaxyx()
             prompt = "Enter task description (ESC to cancel): "
-            y = height // 2
-            x = max(2, (width - len(prompt) - 40) // 2)
 
-            # This is a simplified implementation
-            # In a full implementation, we'd create a proper input dialog
-            task_description = f"Custom Task {len(self.agent_manager.tasks) + 1}"
-            self.agent_manager.add_task(task_description)
+            prompt_y = max(0, height - 3)
+            input_y = max(0, height - 2)
+            win.move(prompt_y, 1)
+            win.clrtoeol()
+            win.addstr(prompt_y, 1, prompt)
+            win.move(input_y, 1)
+            win.clrtoeol()
+            win.refresh()
+
+            buffer: list[str] = []
+
+            while True:
+                ch = win.get_wch()
+                if isinstance(ch, str):
+                    if ch in ("\n", "\r"):
+                        break
+                    if ch == "\x1b":  # ESC
+                        buffer = []
+                        break
+                    if ch in ("\b", "\x7f"):
+                        if buffer:
+                            buffer.pop()
+                            y, x = win.getyx()
+                            win.move(y, max(1, x - 1))
+                            win.delch()
+                    elif 32 <= ord(ch) <= 126:
+                        buffer.append(ch)
+                        win.addstr(ch)
+                elif ch == curses.KEY_BACKSPACE and buffer:
+                    buffer.pop()
+                    y, x = win.getyx()
+                    win.move(y, max(1, x - 1))
+                    win.delch()
+
+            description = "".join(buffer).strip()
+            win.move(prompt_y, 0)
+            win.clrtoeol()
+            win.move(input_y, 0)
+            win.clrtoeol()
+            curses.curs_set(0)
+            win.refresh()
+
+            if not description:
+                return False
+
+            self.agent_manager.add_task(description)
+            self.selected_index = len(self.agent_manager.tasks) - 1
             return True
-
         except Exception:
-            # Fallback if there are issues with curses input
-            task_description = f"New AI Task {len(self.agent_manager.tasks) + 1}"
-            self.agent_manager.add_task(task_description)
-            return True
+            try:
+                curses.curs_set(0)
+            except curses.error:
+                pass
+            return _fallback_input()

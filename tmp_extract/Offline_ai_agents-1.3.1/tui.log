@@ -1,0 +1,10 @@
+[?1049h[1;24r(B[m[4l[?7h[?1l>
+Error: nocbreak() returned ERR
+=== Agent Dashboard Startup ===
+Checking for available models...
+Found existing model: deepseek-coder:6.7b
+✓ Configured agent to use deepseek-coder:6.7b
+
+✓ Ready to start with model: deepseek-coder:6.7b
+
+Starting dashboard...

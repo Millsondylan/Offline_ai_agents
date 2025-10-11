@@ -151,6 +151,7 @@ class Dashboard:
         # Render content panel
         panel = self.panels.get(self.current_panel)
         if panel:
+            setattr(panel, 'stdscr', self.stdscr)
             panel.render(self.stdscr, content_start, menu_width + 1,
                         content_height, content_width)
 
@@ -323,6 +324,15 @@ class Dashboard:
         elif key in [curses.KEY_ENTER, 10, 13]:
             self.activate_menu_item()
             return
+
+        # Delegate to current panel if it can handle the key
+        panel = self.panels.get(self.current_panel)
+        if panel and hasattr(panel, "handle_key"):
+            try:
+                if panel.handle_key(key):
+                    return
+            except Exception:
+                pass
 
     def handle_start_pause(self):
         """Handle start/pause toggle."""

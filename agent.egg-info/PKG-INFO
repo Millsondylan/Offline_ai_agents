@@ -1,0 +1,99 @@
+Metadata-Version: 2.4
+Name: agent
+Version: 1.3.4
+Summary: Modern CLI control panel for autonomous AI agents
+Home-page: https://github.com/Millsondylan/Offline_ai_agents
+Author: Dylan Millson
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: textual>=0.47.0
+Requires-Dist: rich>=13.7.0
+Requires-Dist: pygments>=2.17.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: black>=23.0; extra == "dev"
+Requires-Dist: ruff>=0.0.275; extra == "dev"
+Dynamic: home-page
+Dynamic: requires-python
+
+# Agent Dashboard
+
+Modern CLI control panel for autonomous AI agents, following the specification design.
+
+## Features
+
+- **Dashboard Layout**: Header, menu, content panel, sidebar, footer with breadcrumbs
+- **Task Manager**: Create, delete, activate tasks
+- **Agent Control**: Start, pause, resume, stop
+- **AI Thinking**: Live stream of agent reasoning
+- **Execution Logs**: Filtered, colored log output
+- **Dark/Light Theme**: Toggle with T or F1
+- **Keyboard-Only**: Fast navigation with number keys and arrows
+
+## Quick Start
+
+```bash
+# Run the dashboard
+python -m agent_dashboard
+
+# Or via agent command
+agent
+```
+
+## Keyboard Shortcuts
+
+### Global
+- `1-9` - Jump to menu section
+- `↑/↓` - Navigate lists
+- `Enter` - Select/Confirm
+- `ESC` - Go back
+- `T` or `F1` - Toggle theme
+- `0` or `Q` - Quit
+
+### Agent Control
+- `2` - Start/Pause/Resume
+- `3` - Stop agent
+- `Space` - Quick pause/resume
+
+### Task Manager (Panel 1)
+- `N` - New task
+- `D` - Delete task
+- `A` - Activate task
+
+### AI Thinking (Panel 4)
+- `Home` - Jump to top
+- `End` - Jump to bottom (enable auto-scroll)
+
+### Logs (Panel 5)
+- `F` - Toggle error filter
+- `C` - Clear logs
+
+## Layout
+
+```
+┌─────────────────────────── AGENT DASHBOARD ───────────────────────────┐
+│ Model: GPT-4   Session: 7200   Cycle: #42 (RUNNING)   Elapsed: 130s   │
+│ Status: RUNNING   Mode: Auto   Progress: [████▏     ] 45%             │
+├─────────────────┬───────────────────────────┬────────────────────────┤
+│ ** Main Menu ** │      ** Active Panel **    │ ** Agent Status **     │
+│ 1. Task Manager │                           │ ● Status: RUNNING      │
+│ 2. Start/Pause  │    [Panel Content Here]   │ ● Current Task: ...    │
+│ 3. Stop Agent   │                           │ ● Cycle: 42/100        │
+│ 4. AI Thinking  │                           │ ● Elapsed: 2m 10s      │
+│ 5. Logs         │                           │ ● Mode: Auto           │
+│ 9. Help         │                           │ ● Model: GPT-4         │
+│ 0. Exit         │                           │ ● Errors: 0            │
+├─────────────────┴───────────────────────────┴────────────────────────┤
+│ Breadcrumb: Home › AI Thinking                                        │
+│ Hint: 1-9 = Select | ↑/↓ = Navigate | Enter = Select | ESC = Back    │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+## Implementation
+
+Built with Python curses following the complete specification:
+- Modern TUI aesthetic
+- Beginner-friendly with power-user shortcuts
+- Continuous workflow support
+- Real-time updates
+- Graceful error handling

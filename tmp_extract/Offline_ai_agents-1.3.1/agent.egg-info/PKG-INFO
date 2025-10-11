@@ -1,0 +1,19 @@
+Metadata-Version: 2.1
+Name: agent
+Version: 1.2.3
+Summary: Modern CLI control panel for autonomous AI agents
+Home-page: https://github.com/Millsondylan/Offline_ai_agents
+Author: Dylan Millson
+License: Apache-2.0
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.11
+Provides-Extra: dev
+
+UNKNOWN
+

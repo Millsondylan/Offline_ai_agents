@@ -3,7 +3,9 @@
 import curses
 import os
 from pathlib import Path
+
 from agent_dashboard.panels.base import BasePanel
+from agent_dashboard.core.model_downloader import ModelDownloader
 
 
 class ModelConfigPanel(BasePanel):
@@ -30,16 +32,20 @@ class ModelConfigPanel(BasePanel):
                 models.append((model_file.name, str(model_file)))
 
         # Environment variables
-        if os.getenv("ANTHROPIC_API_KEY"):
-            models.append(("Claude (API)", "Configured"))
-        if os.getenv("OPENAI_API_KEY"):
-            models.append(("OpenAI (API)", "Configured"))
+        for entry in ModelDownloader.API_PROVIDERS:
+            env_var, value, source = ModelDownloader._resolve_api_key(entry)
+            label = f"{entry['label']} (API)"
+            if value:
+                origin = "env" if source == "env" else "stored"
+                models.append((label, f"Configured via {origin}"))
+            elif ModelDownloader.get_stored_api_key(entry["type"]):
+                models.append((label, "Stored (needs export)"))
 
         # Default models
         if not models:
             models = [
                 ("No local models found", "Install Ollama or download models"),
-                ("API keys not set", "Set ANTHROPIC_API_KEY or OPENAI_API_KEY"),
+                ("API keys not set", "Set OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY"),
             ]
 
         return models

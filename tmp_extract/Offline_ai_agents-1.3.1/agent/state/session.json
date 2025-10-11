@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "status": "running",
+  "active_scope": null,
+  "active_started_at": null,
+  "active_duration": null,
+  "review_eta": null,
+  "last_review_at": null
+}

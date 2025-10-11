@@ -1,0 +1,522 @@
+[
+  {
+    "widget_id": "task_000",
+    "label": "Task 000"
+  },
+  {
+    "widget_id": "task_001",
+    "label": "Task 001"
+  },
+  {
+    "widget_id": "task_002",
+    "label": "Task 002"
+  },
+  {
+    "widget_id": "task_003",
+    "label": "Task 003"
+  },
+  {
+    "widget_id": "task_004",
+    "label": "Task 004"
+  },
+  {
+    "widget_id": "task_005",
+    "label": "Task 005"
+  },
+  {
+    "widget_id": "task_006",
+    "label": "Task 006"
+  },
+  {
+    "widget_id": "task_007",
+    "label": "Task 007"
+  },
+  {
+    "widget_id": "task_008",
+    "label": "Task 008"
+  },
+  {
+    "widget_id": "task_009",
+    "label": "Task 009"
+  },
+  {
+    "widget_id": "task_010",
+    "label": "Task 010"
+  },
+  {
+    "widget_id": "task_011",
+    "label": "Task 011"
+  },
+  {
+    "widget_id": "task_012",
+    "label": "Task 012"
+  },
+  {
+    "widget_id": "task_013",
+    "label": "Task 013"
+  },
+  {
+    "widget_id": "task_014",
+    "label": "Task 014"
+  },
+  {
+    "widget_id": "task_015",
+    "label": "Task 015"
+  },
+  {
+    "widget_id": "task_016",
+    "label": "Task 016"
+  },
+  {
+    "widget_id": "task_017",
+    "label": "Task 017"
+  },
+  {
+    "widget_id": "task_018",
+    "label": "Task 018"
+  },
+  {
+    "widget_id": "task_019",
+    "label": "Task 019"
+  },
+  {
+    "widget_id": "task_020",
+    "label": "Task 020"
+  },
+  {
+    "widget_id": "task_021",
+    "label": "Task 021"
+  },
+  {
+    "widget_id": "task_022",
+    "label": "Task 022"
+  },
+  {
+    "widget_id": "task_023",
+    "label": "Task 023"
+  },
+  {
+    "widget_id": "task_024",
+    "label": "Task 024"
+  },
+  {
+    "widget_id": "task_025",
+    "label": "Task 025"
+  },
+  {
+    "widget_id": "task_026",
+    "label": "Task 026"
+  },
+  {
+    "widget_id": "task_027",
+    "label": "Task 027"
+  },
+  {
+    "widget_id": "task_028",
+    "label": "Task 028"
+  },
+  {
+    "widget_id": "task_029",
+    "label": "Task 029"
+  },
+  {
+    "widget_id": "task_030",
+    "label": "Task 030"
+  },
+  {
+    "widget_id": "task_031",
+    "label": "Task 031"
+  },
+  {
+    "widget_id": "task_032",
+    "label": "Task 032"
+  },
+  {
+    "widget_id": "task_033",
+    "label": "Task 033"
+  },
+  {
+    "widget_id": "task_034",
+    "label": "Task 034"
+  },
+  {
+    "widget_id": "task_035",
+    "label": "Task 035"
+  },
+  {
+    "widget_id": "task_036",
+    "label": "Task 036"
+  },
+  {
+    "widget_id": "task_037",
+    "label": "Task 037"
+  },
+  {
+    "widget_id": "task_038",
+    "label": "Task 038"
+  },
+  {
+    "widget_id": "task_039",
+    "label": "Task 039"
+  },
+  {
+    "widget_id": "task_040",
+    "label": "Task 040"
+  },
+  {
+    "widget_id": "task_041",
+    "label": "Task 041"
+  },
+  {
+    "widget_id": "task_042",
+    "label": "Task 042"
+  },
+  {
+    "widget_id": "task_043",
+    "label": "Task 043"
+  },
+  {
+    "widget_id": "task_044",
+    "label": "Task 044"
+  },
+  {
+    "widget_id": "task_045",
+    "label": "Task 045"
+  },
+  {
+    "widget_id": "task_046",
+    "label": "Task 046"
+  },
+  {
+    "widget_id": "task_047",
+    "label": "Task 047"
+  },
+  {
+    "widget_id": "task_048",
+    "label": "Task 048"
+  },
+  {
+    "widget_id": "task_049",
+    "label": "Task 049"
+  },
+  {
+    "widget_id": "task_050",
+    "label": "Task 050"
+  },
+  {
+    "widget_id": "task_051",
+    "label": "Task 051"
+  },
+  {
+    "widget_id": "task_052",
+    "label": "Task 052"
+  },
+  {
+    "widget_id": "task_053",
+    "label": "Task 053"
+  },
+  {
+    "widget_id": "task_054",
+    "label": "Task 054"
+  },
+  {
+    "widget_id": "task_055",
+    "label": "Task 055"
+  },
+  {
+    "widget_id": "task_056",
+    "label": "Task 056"
+  },
+  {
+    "widget_id": "task_057",
+    "label": "Task 057"
+  },
+  {
+    "widget_id": "task_058",
+    "label": "Task 058"
+  },
+  {
+    "widget_id": "task_059",
+    "label": "Task 059"
+  },
+  {
+    "widget_id": "gate_00",
+    "label": "Gate 00"
+  },
+  {
+    "widget_id": "gate_01",
+    "label": "Gate 01"
+  },
+  {
+    "widget_id": "gate_02",
+    "label": "Gate 02"
+  },
+  {
+    "widget_id": "gate_03",
+    "label": "Gate 03"
+  },
+  {
+    "widget_id": "gate_04",
+    "label": "Gate 04"
+  },
+  {
+    "widget_id": "gate_05",
+    "label": "Gate 05"
+  },
+  {
+    "widget_id": "gate_06",
+    "label": "Gate 06"
+  },
+  {
+    "widget_id": "gate_07",
+    "label": "Gate 07"
+  },
+  {
+    "widget_id": "gate_08",
+    "label": "Gate 08"
+  },
+  {
+    "widget_id": "gate_09",
+    "label": "Gate 09"
+  },
+  {
+    "widget_id": "gate_10",
+    "label": "Gate 10"
+  },
+  {
+    "widget_id": "gate_11",
+    "label": "Gate 11"
+  },
+  {
+    "widget_id": "gate_12",
+    "label": "Gate 12"
+  },
+  {
+    "widget_id": "gate_13",
+    "label": "Gate 13"
+  },
+  {
+    "widget_id": "gate_14",
+    "label": "Gate 14"
+  },
+  {
+    "widget_id": "gate_15",
+    "label": "Gate 15"
+  },
+  {
+    "widget_id": "gate_16",
+    "label": "Gate 16"
+  },
+  {
+    "widget_id": "gate_17",
+    "label": "Gate 17"
+  },
+  {
+    "widget_id": "gate_18",
+    "label": "Gate 18"
+  },
+  {
+    "widget_id": "gate_19",
+    "label": "Gate 19"
+  },
+  {
+    "widget_id": "artifact_000",
+    "label": "Artifact 000"
+  },
+  {
+    "widget_id": "artifact_001",
+    "label": "Artifact 001"
+  },
+  {
+    "widget_id": "artifact_002",
+    "label": "Artifact 002"
+  },
+  {
+    "widget_id": "artifact_003",
+    "label": "Artifact 003"
+  },
+  {
+    "widget_id": "artifact_004",
+    "label": "Artifact 004"
+  },
+  {
+    "widget_id": "artifact_005",
+    "label": "Artifact 005"
+  },
+  {
+    "widget_id": "artifact_006",
+    "label": "Artifact 006"
+  },
+  {
+    "widget_id": "artifact_007",
+    "label": "Artifact 007"
+  },
+  {
+    "widget_id": "artifact_008",
+    "label": "Artifact 008"
+  },
+  {
+    "widget_id": "artifact_009",
+    "label": "Artifact 009"
+  },
+  {
+    "widget_id": "artifact_010",
+    "label": "Artifact 010"
+  },
+  {
+    "widget_id": "artifact_011",
+    "label": "Artifact 011"
+  },
+  {
+    "widget_id": "artifact_012",
+    "label": "Artifact 012"
+  },
+  {
+    "widget_id": "artifact_013",
+    "label": "Artifact 013"
+  },
+  {
+    "widget_id": "artifact_014",
+    "label": "Artifact 014"
+  },
+  {
+    "widget_id": "artifact_015",
+    "label": "Artifact 015"
+  },
+  {
+    "widget_id": "artifact_016",
+    "label": "Artifact 016"
+  },
+  {
+    "widget_id": "artifact_017",
+    "label": "Artifact 017"
+  },
+  {
+    "widget_id": "artifact_018",
+    "label": "Artifact 018"
+  },
+  {
+    "widget_id": "artifact_019",
+    "label": "Artifact 019"
+  },
+  {
+    "widget_id": "artifact_020",
+    "label": "Artifact 020"
+  },
+  {
+    "widget_id": "artifact_021",
+    "label": "Artifact 021"
+  },
+  {
+    "widget_id": "artifact_022",
+    "label": "Artifact 022"
+  },
+  {
+    "widget_id": "artifact_023",
+    "label": "Artifact 023"
+  },
+  {
+    "widget_id": "artifact_024",
+    "label": "Artifact 024"
+  },
+  {
+    "widget_id": "artifact_025",
+    "label": "Artifact 025"
+  },
+  {
+    "widget_id": "artifact_026",
+    "label": "Artifact 026"
+  },
+  {
+    "widget_id": "artifact_027",
+    "label": "Artifact 027"
+  },
+  {
+    "widget_id": "artifact_028",
+    "label": "Artifact 028"
+  },
+  {
+    "widget_id": "artifact_029",
+    "label": "Artifact 029"
+  },
+  {
+    "widget_id": "artifact_030",
+    "label": "Artifact 030"
+  },
+  {
+    "widget_id": "artifact_031",
+    "label": "Artifact 031"
+  },
+  {
+    "widget_id": "artifact_032",
+    "label": "Artifact 032"
+  },
+  {
+    "widget_id": "artifact_033",
+    "label": "Artifact 033"
+  },
+  {
+    "widget_id": "artifact_034",
+    "label": "Artifact 034"
+  },
+  {
+    "widget_id": "artifact_035",
+    "label": "Artifact 035"
+  },
+  {
+    "widget_id": "artifact_036",
+    "label": "Artifact 036"
+  },
+  {
+    "widget_id": "artifact_037",
+    "label": "Artifact 037"
+  },
+  {
+    "widget_id": "artifact_038",
+    "label": "Artifact 038"
+  },
+  {
+    "widget_id": "artifact_039",
+    "label": "Artifact 039"
+  },
+  {
+    "widget_id": "control_pause",
+    "label": "Pause"
+  },
+  {
+    "widget_id": "control_resume",
+    "label": "Resume"
+  },
+  {
+    "widget_id": "control_stop",
+    "label": "Stop"
+  },
+  {
+    "widget_id": "control_commit",
+    "label": "Force Commit"
+  },
+  {
+    "widget_id": "tab_diff",
+    "label": "Diff"
+  },
+  {
+    "widget_id": "tab_logs",
+    "label": "Logs"
+  },
+  {
+    "widget_id": "tab_findings",
+    "label": "Findings"
+  },
+  {
+    "widget_id": "tab_config",
+    "label": "Config"
+  },
+  {
+    "widget_id": "diff_apply",
+    "label": "Apply Diff"
+  },
+  {
+    "widget_id": "diff_reject",
+    "label": "Reject Diff"
+  }
+]

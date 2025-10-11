@@ -1,0 +1,12 @@
+{
+  "name": "@millsondylan/agent",
+  "version": "0.2.0",
+  "description": "Always-on offline-first coding agent packaged for npm",
+  "bin": {
+    "agent": "bin/agent.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "license": "Apache-2.0"
+}

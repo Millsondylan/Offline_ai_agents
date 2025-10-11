@@ -1,0 +1,2 @@
+include agent/tui/styles.css
+recursive-include agent/tui *.css

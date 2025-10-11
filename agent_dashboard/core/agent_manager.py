@@ -83,9 +83,14 @@ class AgentManager:
                 status=TaskStatus.PENDING,
                 created_at=datetime.now()
             )
-            self.tasks.append(task)
-            self._add_log(LogLevel.INFO, f"Created task #{task_id}: {description}")
-            return task
+        self.tasks.append(task)
+        self._add_log(LogLevel.INFO, f"Created task #{task_id}: {description}")
+        self.thoughts.append(ThoughtEntry(
+            cycle=self.state.cycle,
+            timestamp=datetime.now(),
+            content=f"📝 Queued task #{task_id}: {description}",
+        ))
+        return task
 
     def delete_task(self, task_id: int):
         """Delete a task."""

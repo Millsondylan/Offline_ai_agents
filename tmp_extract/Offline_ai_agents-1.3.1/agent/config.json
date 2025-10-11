@@ -1,0 +1,128 @@
+{
+  "provider": {
+    "type": "ollama",
+    "model": "deepseek-coder:6.7b-instruct",
+    "command": {
+      "args": [
+        "bash",
+        "-lc",
+        "bash agent/local/ollama_provider.sh"
+      ],
+      "timeout": 1200
+    },
+    "base_url": "http://localhost:11434"
+  },
+  "available_models": [
+    "llama3",
+    "gpt-4",
+    "claude-sonnet-4",
+    "gemini-2.0-flash"
+  ],
+  "loop": {
+    "max_cycles": 10,
+    "cooldown_seconds": 5,
+    "apply_patches": true,
+    "require_manual_approval": false,
+    "fast_path_on_fs_change": true
+  },
+  "sessions": {
+    "enabled": true,
+    "default_duration_seconds": 3600,
+    "default_post_review_delay_seconds": 3600,
+    "max_duration_seconds": 28800
+  },
+  "commands": {
+    "analyze": {
+      "enabled": true,
+      "cmd": "ruff check",
+      "timeout": 900
+    },
+    "test": {
+      "enabled": true,
+      "cmd": "pytest -q",
+      "timeout": 3600
+    },
+    "e2e": {
+      "enabled": false,
+      "cmd": "",
+      "timeout": 7200
+    },
+    "screenshots": {
+      "enabled": false,
+      "cmd": "",
+      "timeout": 600
+    }
+  },
+  "gate": {
+    "min_coverage": 0.8,
+    "ruff_fix": true,
+    "bandit_fail_levels": [
+      "HIGH",
+      "CRITICAL"
+    ],
+    "semgrep_rules": [
+      "p/ci",
+      "p/python"
+    ],
+    "pip_audit_fix": false,
+    "allow_override": false
+  },
+  "ui_audits": {
+    "enabled": false,
+    "targets": [
+      "http://localhost:3000/",
+      "http://localhost:8000/"
+    ],
+    "lighthouse": {
+      "enabled": true,
+      "flags": [
+        "--quiet",
+        "--chrome-flags=--headless"
+      ]
+    },
+    "axe": {
+      "enabled": true,
+      "flags": []
+    },
+    "pa11y": {
+      "enabled": true,
+      "flags": []
+    }
+  },
+  "git": {
+    "commit": true,
+    "branch": "agent/main",
+    "push": false,
+    "remote": "origin",
+    "push_interval_seconds": 900,
+    "commit_cadence_seconds": 3600,
+    "auto_commit": true
+  },
+  "patch": {
+    "path_prefix": ""
+  },
+  "tui": {
+    "refresh_hz": 15,
+    "show_thinking": true,
+    "theme": "auto"
+  },
+  "task_execution": {
+    "default_max_verifications": 100,
+    "default_max_duration": 3600,
+    "enabled_checks": [
+      "syntax_valid",
+      "imports_valid",
+      "tests_pass",
+      "linter_pass",
+      "formatter_check",
+      "security_scan",
+      "dependency_audit",
+      "build_success",
+      "no_conflicts",
+      "type_check",
+      "coverage_threshold"
+    ],
+    "require_all_critical": true,
+    "abort_on_critical_failure": true
+  }
+}

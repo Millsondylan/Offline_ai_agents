@@ -40,16 +40,13 @@ def run_real_agent():
     """Run the autonomous file-editing agent."""
     try:
         print("=== Autonomous AI Agent ===")
-        print("Checking for available models...")
+        print("Checking provider configuration...")
 
-        model = ModelDownloader.ensure_model_available()
-        if model:
-            ModelDownloader.configure_agent_for_ollama(model)
-            print(f"✓ Using model: {model}")
-        else:
-            print("⚠ No model available. Please install Ollama and download a model:")
-            print("  brew install ollama")
-            print("  ollama pull deepseek-coder:6.7b")
+        provider = ModelDownloader.ensure_provider_configured()
+        if not provider:
+            print("⚠ Unable to configure a model provider automatically.")
+            print("   • Install Ollama and pull a DeepSeek model, or")
+            print("   • Set OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY.")
             sys.exit(1)
 
         print("\nStarting autonomous agent...")
@@ -83,33 +80,36 @@ def run_real_agent():
         sys.exit(1)
 
 
-def run_dashboard():
+def run_dashboard(use_codex: bool = False):
     """Run the agent dashboard."""
     try:
-        # Ensure model is available before starting dashboard
         print("=== Agent Dashboard Startup ===")
-        print("Checking for available models...")
+        print("Checking provider configuration...")
 
-        model = ModelDownloader.ensure_model_available()
-        if model:
-            ModelDownloader.configure_agent_for_ollama(model)
-            print(f"\n✓ Ready to start with model: {model}")
+        provider = ModelDownloader.ensure_provider_configured()
+        if provider:
+            provider_display = f"{provider.provider_type}:{provider.model}" if provider.model else provider.provider_type
+            print(f"\n✓ Ready to start with provider: {provider_display}")
         else:
-            print("\n⚠ No model available. You can:")
-            print("1. Install Ollama: brew install ollama")
-            print("2. Download a model: ollama pull deepseek-coder:33b")
-            print("3. Set API keys: export ANTHROPIC_API_KEY=...")
-            print("\nContinuing anyway (configure model in dashboard)...")
+            print("\n⚠ No provider configured.")
+            print("   • Install Ollama and pull a DeepSeek model")
+            print("   • Or set OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY")
+            print("\nContinuing anyway (dashboard will run with limited functionality)...")
 
-        print("\nStarting dashboard...")
-        try:
-            curses.wrapper(main_curses)
-        except curses.error as e:
-            print(f"\nCurses interface failed: {e}", file=sys.stderr)
-            print("Falling back to simple CLI interface...", file=sys.stderr)
-            from agent_dashboard.simple_cli import SimpleCLI
-            cli = SimpleCLI()
-            cli.run()
+        if use_codex:
+            print("\nStarting Codex-style dashboard...")
+            from agent_dashboard.codex_dashboard import run_codex_dashboard
+            run_codex_dashboard()
+        else:
+            print("\nStarting dashboard...")
+            try:
+                curses.wrapper(main_curses)
+            except curses.error as e:
+                print(f"\nCurses interface failed: {e}", file=sys.stderr)
+                print("Falling back to simple CLI interface...", file=sys.stderr)
+                from agent_dashboard.simple_cli import SimpleCLI
+                cli = SimpleCLI()
+                cli.run()
     except KeyboardInterrupt:
         print("\nExiting...")
     except Exception as e:
@@ -125,7 +125,8 @@ def main():
         epilog="""
 Examples:
   agent                    # Run autonomous agent (default)
-  agent --dashboard        # Run monitoring dashboard
+  agent --dashboard        # Run monitoring dashboard (curses-based)
+  agent --codex            # Run modern Codex-style dashboard
   agent --version          # Show version info
 
 The autonomous agent reads tasks from agent/local/control/task.txt and
@@ -134,6 +135,8 @@ edits files in your current directory automatically.
 
     parser.add_argument('--dashboard', action='store_true',
                        help='Run the monitoring dashboard instead of the autonomous agent')
+    parser.add_argument('--codex', action='store_true',
+                       help='Run the modern Codex-style dashboard (requires textual, rich, pygments)')
     parser.add_argument('--version', action='store_true',
                        help='Show version information')
 
@@ -147,8 +150,10 @@ edits files in your current directory automatically.
             print("Agent version: unknown")
         return
 
-    if args.dashboard:
-        run_dashboard()
+    if args.codex:
+        run_dashboard(use_codex=True)
+    elif args.dashboard:
+        run_dashboard(use_codex=False)
     else:
         run_real_agent()
 
