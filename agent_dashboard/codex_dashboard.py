@@ -19,6 +19,7 @@ from agent_dashboard.codex_widgets import (
     LogViewer,
     CodeViewer,
     ModelConfigPanel,
+    ProjectGoalPanel,
 )
 
 
@@ -58,6 +59,8 @@ class CodexDashboard(App):
         Binding("3", "show_logs", "Logs"),
         Binding("4", "show_code", "Code"),
         Binding("5", "show_model", "Model"),
+        Binding("6", "show_goal", "Goal"),
+        Binding("g", "show_goal", "Goal"),
         Binding("s", "start_agent", "Start"),
         Binding("p", "pause_agent", "Pause"),
         Binding("x", "stop_agent", "Stop"),
@@ -105,6 +108,7 @@ class CodexDashboard(App):
             yield LogViewer(id="panel-logs")
             yield CodeViewer(id="panel-code")
             yield ModelConfigPanel(id="panel-model")
+            yield ProjectGoalPanel(id="panel-goal")
 
         yield Footer()
 
@@ -123,6 +127,7 @@ class CodexDashboard(App):
             "logs": "panel-logs",
             "code": "panel-code",
             "model": "panel-model",
+            "goal": "panel-goal",
         }
 
         for name, panel_id in panels.items():
@@ -190,6 +195,16 @@ class CodexDashboard(App):
                 except Exception:
                     pass
 
+            elif self._current_panel == "goal":
+                try:
+                    goal_panel = self.query_one("#panel-goal", ProjectGoalPanel)
+                    # Update progress
+                    total = len(tasks)
+                    completed = sum(1 for t in tasks if t.status.value == "Completed")
+                    goal_panel.update_progress(total, completed)
+                except Exception:
+                    pass
+
         except Exception:
             pass
 
@@ -247,6 +262,62 @@ class CodexDashboard(App):
         """Handle refresh request."""
         self.notify("Refreshing tasks...", severity="information")
 
+    def on_project_goal_panel_generate_tasks_requested(self, message: ProjectGoalPanel.GenerateTasksRequested) -> None:
+        """Handle task generation request from project goal panel."""
+        try:
+            self.notify(f"Generating tasks for: {message.project_title}", severity="information")
+
+            # Use AI to generate tasks
+            generated_tasks = self._agent_manager.generate_tasks_from_goal(message.objective)
+
+            # Notify the panel of completion
+            try:
+                goal_panel = self.query_one("#panel-goal", ProjectGoalPanel)
+                goal_panel.task_generation_complete(len(generated_tasks), len(generated_tasks) > 0)
+            except Exception:
+                pass
+
+            if generated_tasks:
+                self.notify(f"Successfully generated {len(generated_tasks)} tasks!", severity="information")
+            else:
+                self.notify("Failed to generate tasks", severity="error")
+
+        except Exception as e:
+            self.notify(f"Error generating tasks: {str(e)}", severity="error")
+            try:
+                goal_panel = self.query_one("#panel-goal", ProjectGoalPanel)
+                goal_panel.task_generation_complete(0, False)
+            except Exception:
+                pass
+
+    def on_project_goal_panel_start_project_requested(self, message: ProjectGoalPanel.StartProjectRequested) -> None:
+        """Handle project start request."""
+        try:
+            # Activate the first pending task if any
+            pending_tasks = [t for t in self._agent_manager.tasks if t.status.value == "Pending"]
+            if pending_tasks:
+                first_task = pending_tasks[0]
+                self._agent_manager.set_active_task(first_task.id)
+                self.notify(f"Activated task: {first_task.description[:50]}", severity="information")
+
+            # Start the agent
+            self._start_agent()
+
+        except Exception as e:
+            self.notify(f"Error starting project: {str(e)}", severity="error")
+
+    def on_project_goal_panel_refresh_progress_requested(self, message: ProjectGoalPanel.RefreshProgressRequested) -> None:
+        """Handle progress refresh request."""
+        try:
+            tasks = self._agent_manager.tasks
+            goal_panel = self.query_one("#panel-goal", ProjectGoalPanel)
+            total = len(tasks)
+            completed = sum(1 for t in tasks if t.status.value == "Completed")
+            goal_panel.update_progress(total, completed)
+            self.notify(f"Progress: {completed}/{total} tasks complete", severity="information")
+        except Exception as e:
+            self.notify(f"Error refreshing progress: {str(e)}", severity="error")
+
     def _start_agent(self) -> None:
         """Start the agent."""
         try:
@@ -298,6 +369,10 @@ class CodexDashboard(App):
     def action_show_model(self) -> None:
         """Show model config panel."""
         self._show_panel("model")
+
+    def action_show_goal(self) -> None:
+        """Show project goal panel."""
+        self._show_panel("goal")
 
     def action_start_agent(self) -> None:
         """Start agent via keyboard shortcut."""

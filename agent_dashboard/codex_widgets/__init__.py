@@ -8,6 +8,7 @@ from agent_dashboard.codex_widgets.task_panel import TaskPanel
 from agent_dashboard.codex_widgets.log_viewer import LogViewer
 from agent_dashboard.codex_widgets.code_viewer import CodeViewer
 from agent_dashboard.codex_widgets.model_config_panel import ModelConfigPanel
+from agent_dashboard.codex_widgets.project_goal_panel import ProjectGoalPanel
 
 __all__ = [
     "StatusHeader",
@@ -18,4 +19,5 @@ __all__ = [
     "LogViewer",
     "CodeViewer",
     "ModelConfigPanel",
+    "ProjectGoalPanel",
 ]

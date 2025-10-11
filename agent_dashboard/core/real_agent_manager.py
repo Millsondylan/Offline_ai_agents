@@ -77,6 +77,20 @@ class RealAgentManager:
                 self._add_log(LogLevel.WARN, "No provider configured; running simulation mode")
                 self.state.model = "unconfigured"
 
+            # Create default task if none exists and task file is empty
+            if not self.tasks and not self.task_file.exists():
+                default_task = "Review codebase and suggest improvements"
+                task_id = 1
+                task = Task(
+                    id=task_id,
+                    description=default_task,
+                    status=TaskStatus.PENDING,
+                    created_at=datetime.now()
+                )
+                self.tasks.append(task)
+                self._add_log(LogLevel.INFO, f"Created default task: {default_task}")
+                self._record_thought(f"📝 Created default task #{task_id}: {default_task}")
+
             self.state.status = AgentStatus.RUNNING
             self.state.cycle = 0
             self._start_time = time.time()
@@ -370,8 +384,49 @@ class RealAgentManager:
                 return
 
             self._record_thought("🔌 Launching agent loop")
+            self._write_thinking_event("action", {
+                "action": "start_agent",
+                "details": "Starting autonomous agent loop",
+                "status": "started"
+            })
+
             with self._lock:
                 self._add_log(LogLevel.INFO, "Starting autonomous agent")
+
+            # Ensure task file exists with content
+            if not self.task_file.exists() or self.task_file.stat().st_size == 0:
+                with self._lock:
+                    if not self.tasks:
+                        # Create default task if absolutely none exist
+                        default_task = "Review codebase and suggest improvements"
+                        task_id = max([t.id for t in self.tasks], default=0) + 1
+                        task = Task(
+                            id=task_id,
+                            description=default_task,
+                            status=TaskStatus.PENDING,
+                            created_at=datetime.now()
+                        )
+                        self.tasks.append(task)
+                        self._add_log(LogLevel.INFO, f"Created startup task: {default_task}")
+                        task_content = default_task
+                    else:
+                        # Use first pending task
+                        pending = next((t for t in self.tasks if t.status == TaskStatus.PENDING), None)
+                        if pending:
+                            task_content = pending.description
+                            self._add_log(LogLevel.INFO, f"Writing task #{pending.id} to file")
+                        else:
+                            # No pending tasks, use first task
+                            task_content = self.tasks[0].description
+                            self._add_log(LogLevel.INFO, f"Writing task #{self.tasks[0].id} to file")
+
+                    # Write task to file
+                    try:
+                        with open(self.task_file, 'w', encoding='utf-8') as f:
+                            f.write(task_content + '\n')
+                        self._add_log(LogLevel.INFO, f"Task file ready: {task_content[:50]}...")
+                    except Exception as write_error:
+                        self._add_log(LogLevel.ERROR, f"Failed to write task file: {write_error}")
 
             from agent.run import AgentLoop, load_config  # type: ignore
 
@@ -406,6 +461,13 @@ class RealAgentManager:
             with self._lock:
                 cycle += 1
                 self.state.cycle = cycle
+
+                # Write cycle start event
+                self._write_thinking_event("cycle_start", {
+                    "cycle": cycle,
+                    "message": f"Starting cycle {cycle}"
+                })
+
                 self.state.progress_percent = min(100, self.state.progress_percent + 7)
 
                 # Ensure there's an active task if any pending
@@ -422,10 +484,25 @@ class RealAgentManager:
                     self._record_thought(f"🚀 Starting task #{pending_task.id}: {pending_task.description}")
                     self._add_log(LogLevel.INFO, f"Task #{pending_task.id} marked as in progress")
 
+                    # Write action event
+                    self._write_thinking_event("action", {
+                        "action": "start_task",
+                        "details": f"Task #{pending_task.id}: {pending_task.description}",
+                        "status": "started"
+                    })
+
                 if active_task and cycle % 3 == 0:
                     active_task.status = TaskStatus.COMPLETED
                     self._record_thought(f"✅ Completed task #{active_task.id}: {active_task.description}")
                     self._add_log(LogLevel.INFO, f"Task '{active_task.description}' completed")
+
+                    # Write action event
+                    self._write_thinking_event("action", {
+                        "action": "complete_task",
+                        "details": f"Task #{active_task.id}: {active_task.description}",
+                        "status": "completed"
+                    })
+
                     self.active_task_id = None
                     self.state.current_task = None
 
@@ -434,6 +511,12 @@ class RealAgentManager:
 
                 # Add general cycle log
                 self._add_log(LogLevel.INFO, f"Cycle {cycle}: routine diagnostics complete")
+
+                # Write cycle end event
+                self._write_thinking_event("cycle_end", {
+                    "cycle": cycle,
+                    "message": f"Cycle {cycle} complete"
+                })
 
                 if self.state.progress_percent >= 100:
                     self._record_thought("🎉 Reached 100% progress - idling until new work arrives")
@@ -486,11 +569,336 @@ class RealAgentManager:
         elif level == LogLevel.WARN:
             self.state.warnings += 1
 
+    def _write_thinking_event(self, event_type: str, data: dict):
+        """Write an event to thinking.jsonl in the correct format."""
+        thinking_file = self.repo_root / "agent" / "state" / "thinking.jsonl"
+        thinking_file.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            event = {
+                "timestamp": time.time(),
+                "cycle": self.state.cycle,
+                "event_type": event_type,
+                "data": data
+            }
+            with open(thinking_file, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(event) + '\n')
+        except Exception:
+            # Don't fail if we can't write to thinking file
+            pass
+
     def _record_thought(self, content: str):
-        """Append a thought entry to the rolling history."""
+        """Append a thought entry to the rolling history and thinking.jsonl file."""
         entry = ThoughtEntry(
             cycle=self.state.cycle,
             timestamp=datetime.now(),
             content=content,
         )
         self.thoughts.append(entry)
+
+        # Write to thinking.jsonl for real-time display
+        self._write_thinking_event("thinking", {
+            "type": "general",
+            "content": content,
+            "metadata": {}
+        })
+
+    def generate_tasks_from_goal(self, objective: str) -> List[Task]:
+        """Use AI to break down a project goal into specific tasks."""
+        generated_tasks = []
+
+        try:
+            # Check if we have a configured provider
+            if not self.provider_info:
+                self.provider_info = ModelDownloader.ensure_provider_configured()
+
+            if not self.provider_info:
+                self._add_log(LogLevel.ERROR, "No AI provider configured for task generation")
+                # Fallback: Create basic tasks from the objective
+                return self._generate_basic_tasks_fallback(objective)
+
+            # Prepare the prompt for AI task breakdown
+            prompt = self._build_task_generation_prompt(objective)
+
+            # Use the configured AI model to generate tasks
+            tasks_list = self._call_ai_for_tasks(prompt)
+
+            if not tasks_list:
+                # Fallback if AI call fails
+                return self._generate_basic_tasks_fallback(objective)
+
+            # Create Task objects from the AI response
+            with self._lock:
+                for idx, task_description in enumerate(tasks_list, 1):
+                    task_id = max([t.id for t in self.tasks], default=0) + 1
+                    task = Task(
+                        id=task_id,
+                        description=task_description,
+                        status=TaskStatus.PENDING,
+                        created_at=datetime.now(),
+                        priority=idx
+                    )
+                    generated_tasks.append(task)
+                    self.tasks.append(task)
+
+                self._add_log(LogLevel.INFO, f"Generated {len(generated_tasks)} tasks from project goal")
+                self._record_thought(f"🎯 Created {len(generated_tasks)} tasks for: {objective[:50]}...")
+
+            return generated_tasks
+
+        except Exception as e:
+            self._add_log(LogLevel.ERROR, f"Error generating tasks: {e}")
+            return self._generate_basic_tasks_fallback(objective)
+
+    def _build_task_generation_prompt(self, objective: str) -> str:
+        """Build a prompt for AI to generate tasks."""
+        return f"""You are a project planning assistant. Break down the following project objective into specific, actionable tasks.
+
+Project Objective:
+{objective}
+
+Requirements:
+1. Create 5-8 specific, actionable tasks
+2. Each task should be clear and implementable
+3. Tasks should be ordered logically (dependencies first)
+4. Include setup, implementation, testing, and documentation tasks
+5. Each task should be one sentence, starting with an action verb
+
+Respond with ONLY a JSON array of task descriptions, no other text:
+["Task 1 description", "Task 2 description", ...]
+
+Example output format:
+["Set up project structure and dependencies", "Implement core functionality", "Add error handling and validation", "Write unit tests", "Create documentation"]
+
+Generate tasks now:"""
+
+    def _call_ai_for_tasks(self, prompt: str) -> List[str]:
+        """Call the configured AI provider to generate tasks."""
+        try:
+            provider_type = self.provider_info.provider_type
+            model = self.provider_info.model or "default"
+
+            if provider_type == "ollama":
+                return self._call_ollama_for_tasks(prompt, model)
+            elif provider_type == "openai":
+                return self._call_openai_for_tasks(prompt, model)
+            elif provider_type == "anthropic":
+                return self._call_anthropic_for_tasks(prompt, model)
+            elif provider_type == "gemini":
+                return self._call_gemini_for_tasks(prompt, model)
+            else:
+                self._add_log(LogLevel.WARN, f"Unknown provider type: {provider_type}")
+                return []
+
+        except Exception as e:
+            self._add_log(LogLevel.ERROR, f"AI call failed: {e}")
+            return []
+
+    def _call_ollama_for_tasks(self, prompt: str, model: str) -> List[str]:
+        """Call Ollama API for task generation."""
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['ollama', 'run', model, prompt],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+
+            if result.returncode == 0:
+                response = result.stdout.strip()
+                return self._parse_task_response(response)
+            else:
+                self._add_log(LogLevel.ERROR, f"Ollama error: {result.stderr}")
+                return []
+        except Exception as e:
+            self._add_log(LogLevel.ERROR, f"Ollama call failed: {e}")
+            return []
+
+    def _call_openai_for_tasks(self, prompt: str, model: str) -> List[str]:
+        """Call OpenAI API for task generation."""
+        try:
+            import os
+            import requests
+
+            api_key = os.getenv("OPENAI_API_KEY") or ModelDownloader.get_stored_api_key("openai")
+            if not api_key:
+                self._add_log(LogLevel.ERROR, "No OpenAI API key found")
+                return []
+
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+
+            data = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_tokens": 1000
+            }
+
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                json=data,
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                content = result["choices"][0]["message"]["content"]
+                return self._parse_task_response(content)
+            else:
+                self._add_log(LogLevel.ERROR, f"OpenAI API error: {response.status_code}")
+                return []
+
+        except Exception as e:
+            self._add_log(LogLevel.ERROR, f"OpenAI call failed: {e}")
+            return []
+
+    def _call_anthropic_for_tasks(self, prompt: str, model: str) -> List[str]:
+        """Call Anthropic API for task generation."""
+        try:
+            import os
+            import requests
+
+            api_key = os.getenv("ANTHROPIC_API_KEY") or ModelDownloader.get_stored_api_key("anthropic")
+            if not api_key:
+                self._add_log(LogLevel.ERROR, "No Anthropic API key found")
+                return []
+
+            headers = {
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json"
+            }
+
+            data = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 1000
+            }
+
+            response = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers=headers,
+                json=data,
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                content = result["content"][0]["text"]
+                return self._parse_task_response(content)
+            else:
+                self._add_log(LogLevel.ERROR, f"Anthropic API error: {response.status_code}")
+                return []
+
+        except Exception as e:
+            self._add_log(LogLevel.ERROR, f"Anthropic call failed: {e}")
+            return []
+
+    def _call_gemini_for_tasks(self, prompt: str, model: str) -> List[str]:
+        """Call Google Gemini API for task generation."""
+        try:
+            import os
+            import requests
+
+            api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY") or ModelDownloader.get_stored_api_key("gemini")
+            if not api_key:
+                self._add_log(LogLevel.ERROR, "No Gemini API key found")
+                return []
+
+            url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={api_key}"
+
+            data = {
+                "contents": [{
+                    "parts": [{"text": prompt}]
+                }]
+            }
+
+            response = requests.post(url, json=data, timeout=30)
+
+            if response.status_code == 200:
+                result = response.json()
+                content = result["candidates"][0]["content"]["parts"][0]["text"]
+                return self._parse_task_response(content)
+            else:
+                self._add_log(LogLevel.ERROR, f"Gemini API error: {response.status_code}")
+                return []
+
+        except Exception as e:
+            self._add_log(LogLevel.ERROR, f"Gemini call failed: {e}")
+            return []
+
+    def _parse_task_response(self, response: str) -> List[str]:
+        """Parse AI response to extract task list."""
+        try:
+            # Try to extract JSON array from response
+            import re
+
+            # Remove markdown code blocks if present
+            response = re.sub(r'```json\s*', '', response)
+            response = re.sub(r'```\s*', '', response)
+            response = response.strip()
+
+            # Find JSON array in response
+            array_match = re.search(r'\[.*\]', response, re.DOTALL)
+            if array_match:
+                json_str = array_match.group(0)
+                tasks = json.loads(json_str)
+
+                if isinstance(tasks, list) and all(isinstance(t, str) for t in tasks):
+                    # Clean up tasks
+                    return [t.strip() for t in tasks if t.strip()]
+
+            # Fallback: try line-by-line parsing
+            lines = response.split('\n')
+            tasks = []
+            for line in lines:
+                line = line.strip()
+                # Remove numbering and quotes
+                line = re.sub(r'^\d+\.\s*', '', line)
+                line = line.strip('"\'')
+                if line and len(line) > 10:  # Ignore very short lines
+                    tasks.append(line)
+
+            if tasks:
+                return tasks[:8]  # Limit to 8 tasks
+
+            return []
+
+        except Exception as e:
+            self._add_log(LogLevel.ERROR, f"Failed to parse AI response: {e}")
+            return []
+
+    def _generate_basic_tasks_fallback(self, objective: str) -> List[Task]:
+        """Generate basic tasks when AI is not available."""
+        with self._lock:
+            basic_tasks = [
+                "Analyze project requirements and create technical specification",
+                f"Set up project structure for: {objective[:50]}",
+                "Implement core functionality and main features",
+                "Add comprehensive error handling and input validation",
+                "Write unit tests to ensure code quality",
+                "Perform integration testing and bug fixes",
+                "Create user documentation and code comments",
+                "Final review and optimization",
+            ]
+
+            generated_tasks = []
+            for idx, description in enumerate(basic_tasks, 1):
+                task_id = max([t.id for t in self.tasks], default=0) + 1
+                task = Task(
+                    id=task_id,
+                    description=description,
+                    status=TaskStatus.PENDING,
+                    created_at=datetime.now(),
+                    priority=idx
+                )
+                generated_tasks.append(task)
+                self.tasks.append(task)
+
+            self._add_log(LogLevel.INFO, f"Generated {len(generated_tasks)} basic tasks (AI unavailable)")
+            return generated_tasks

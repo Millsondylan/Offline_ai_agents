@@ -73,6 +73,7 @@ class NavSidebar(Widget):
             yield Button("Logs", id="nav-logs")
             yield Button("Code Viewer", id="nav-code")
             yield Button("Model Config", id="nav-model")
+            yield Button("Project Goal", id="nav-goal")
 
             yield Static("CONTROLS", classes="section-header")
             yield Button("Start Agent", id="control-start", variant="success")
@@ -81,7 +82,6 @@ class NavSidebar(Widget):
             yield Button("Run Tests", id="control-verify", variant="default")
 
             yield Static("SYSTEM", classes="section-header")
-            yield Button("Model Config", id="system-model")
             yield Button("Exit", id="system-exit", variant="error")
 
     def set_active_panel(self, panel_name: str) -> None:
