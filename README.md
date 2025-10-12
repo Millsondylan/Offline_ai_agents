@@ -166,16 +166,39 @@ Artifacts per cycle are written to `agent/artifacts/cycle_<N>_<timestamp>` and i
 
 ## Providers
 
-This agent ships with flexible providers (configured in `agent/config.json`):
+This agent supports multiple AI providers (configured in `agent/config.json`):
 
-- `command` / `ollama`: pipes the prompt to a local command. Use the bundled `agent/local/ollama_provider.sh` or point directly at `ollama run <model>`.
-- `manual`: writes `prompt.md` and waits for you to drop a diff at either `agent/artifacts/.../inbox.patch` or `agent/inbox/<cycle_basename>.patch`.
-- `api`: uses a hosted model (OpenAI, Anthropic, etc.) with secrets stored via the system keyring (see `agent apikey`).
+### Local/Offline
+- **Ollama** - Run models locally (recommended). Supports both HTTP API and CLI modes.
+  - `deepseek-coder:6.7b-instruct` - Recommended coding model (~4GB)
+  - `llama3`, `codellama`, etc.
+  - Free, offline, no API keys needed
 
-Environment hints for the Ollama command provider:
-- `OLLAMA_MODEL` or `MODEL` to select a specific model
-- `OLLAMA_HIDE_THINKING=1` to hide reasoning tokens (default)
-- `OLLAMA_NUM_CTX` and `OLLAMA_KV_CACHE_TYPE` to tune context and cache
+### Cloud APIs
+- **OpenAI** - GPT-4, GPT-4o-mini, etc.
+- **Anthropic** - Claude 3.5 Sonnet, Claude 3 Opus, etc.
+- **Google Gemini** - Gemini 2.0 Flash, Gemini Pro
+
+### Other
+- **Manual** - Write patches manually for review
+
+**📖 See [PROVIDER_SETUP.md](PROVIDER_SETUP.md) for complete setup instructions**
+
+Quick start:
+```bash
+# Option 1: Local (Ollama)
+brew install ollama
+ollama serve
+ollama pull deepseek-coder:6.7b-instruct
+
+# Option 2: Cloud (OpenAI)
+export OPENAI_API_KEY="sk-..."
+```
+
+Test your connection:
+```bash
+python3 test_provider_connection.py
+```
 
 ## Configuration
 
